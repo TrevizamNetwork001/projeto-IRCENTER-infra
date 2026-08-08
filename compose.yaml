@@ -27,7 +27,9 @@ services:
     restart: unless-stopped
     working_dir: /var/www/html
     volumes:
-      - ./app:/var/www/html
+      - ./app:/var/www/html:ro
+      - app_storage:/var/www/html/storage
+      - app_cache:/var/www/html/bootstrap/cache
     networks:
       - backend
 
@@ -40,7 +42,9 @@ services:
     working_dir: /var/www/html
     command: php artisan queue:work --sleep=3 --tries=3 --timeout=90
     volumes:
-      - ./app:/var/www/html
+      - ./app:/var/www/html:ro
+      - app_storage:/var/www/html/storage
+      - app_cache:/var/www/html/bootstrap/cache
     depends_on:
       postgres:
         condition: service_healthy
@@ -58,7 +62,9 @@ services:
     working_dir: /var/www/html
     command: php artisan schedule:work
     volumes:
-      - ./app:/var/www/html
+      - ./app:/var/www/html:ro
+      - app_storage:/var/www/html/storage
+      - app_cache:/var/www/html/bootstrap/cache
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,7 +81,9 @@ services:
     restart: unless-stopped
     working_dir: /var/www/documentation
     volumes:
-      - ./documentation-app:/var/www/documentation
+      - ./documentation-app:/var/www/documentation:ro
+      - documentation_storage:/var/www/documentation/storage
+      - documentation_cache:/var/www/documentation/bootstrap/cache
     depends_on:
       postgres:
         condition: service_healthy
@@ -91,7 +99,9 @@ services:
     working_dir: /var/www/documentation
     command: php artisan queue:work --sleep=3 --tries=3 --timeout=90
     volumes:
-      - ./documentation-app:/var/www/documentation
+      - ./documentation-app:/var/www/documentation:ro
+      - documentation_storage:/var/www/documentation/storage
+      - documentation_cache:/var/www/documentation/bootstrap/cache
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,7 +117,9 @@ services:
     working_dir: /var/www/documentation
     command: php artisan schedule:work
     volumes:
-      - ./documentation-app:/var/www/documentation
+      - ./documentation-app:/var/www/documentation:ro
+      - documentation_storage:/var/www/documentation/storage
+      - documentation_cache:/var/www/documentation/bootstrap/cache
     depends_on:
       postgres:
         condition: service_healthy
@@ -164,6 +176,14 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  app_storage:
+    name: ircenter_app_storage
+  app_cache:
+    name: ircenter_app_cache
+  documentation_storage:
+    name: ircenter_documentation_storage
+  documentation_cache:
+    name: ircenter_documentation_cache
   certbot_www:
     name: ircenter_certbot_www
   certbot_conf:

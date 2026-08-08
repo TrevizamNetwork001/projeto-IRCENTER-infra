@@ -10,9 +10,9 @@ ACTION="${1-test}"
 case "$TARGET" in
     app) SERVICE=app-test ;;
     documentation) SERVICE=documentation-test ;;
-    *) printf 'Uso: %s {app|documentation} [verify|smoke|test] [argumentos PHPUnit]\n' "$0" >&2; exit 64 ;;
+    *) printf 'Uso: %s {app|documentation} [verify|smoke|queue|scheduler|test] [argumentos PHPUnit]\n' "$0" >&2; exit 64 ;;
 esac
-case "$ACTION" in verify|smoke|test) ;; *) printf 'Acao invalida.\n' >&2; exit 64 ;; esac
+case "$ACTION" in verify|smoke|queue|scheduler|test) ;; *) printf 'Acao invalida.\n' >&2; exit 64 ;; esac
 
 SNAPSHOT_DIR=$(mktemp -d -t ircenter-test-isolation.XXXXXX)
 BEFORE_FILES="$SNAPSHOT_DIR/files.before"

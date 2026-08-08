@@ -11,14 +11,17 @@ cache diretamente nos filesystems usados pelos containers de producao.
 ./scripts/test-isolated.sh documentation
 ```
 
-Use `verify` para validar as barreiras sem Laravel e `smoke` para executar apenas
-`artisan about` dentro do runner, por exemplo:
+Use `verify` para validar as barreiras sem Laravel, `smoke` para executar apenas
+`artisan about`, `queue` para um worker efêmero e `scheduler` para validar o
+registro do scheduler dentro do runner, por exemplo:
 
 ```sh
 ./scripts/test-isolated.sh app verify
 ./scripts/test-isolated.sh app smoke
 ./scripts/test-isolated.sh documentation verify
 ./scripts/test-isolated.sh documentation smoke
+./scripts/test-isolated.sh app queue
+./scripts/test-isolated.sh documentation scheduler
 ```
 
 ## Garantias

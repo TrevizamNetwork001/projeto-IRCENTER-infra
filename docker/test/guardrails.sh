@@ -47,9 +47,35 @@ esac
 
 [ "$PWD" = /workspace/app ] || abort "diretorio de trabalho inesperado"
 [ ! -e /opt/ircenter/app ] || abort "workspace produtivo visivel no runner"
+[ "$(id -u)" = 33 ] || abort "runtime de teste nao e www-data (uid 33)"
+[ "$(id -g)" = 33 ] || abort "grupo de teste nao e www-data (gid 33)"
 [ -w storage ] || abort "storage efemero nao gravavel"
 [ -w bootstrap/cache ] || abort "bootstrap/cache efemero nao gravavel"
 [ ! -w composer.json ] || abort "codigo da aplicacao esta gravavel"
+
+probe_directory_write() {
+    directory="$1"
+    marker="$directory/.h3-write-probe"
+    if ( : > "$marker" ) >/dev/null 2>&1; then
+        rm -f -- "$marker"
+        abort "diretorio de source gravavel: $directory"
+    fi
+    return 0
+}
+
+probe_file_write() {
+    file="$1"
+    if ( : > "$file" ) >/dev/null 2>&1; then
+        abort "arquivo de source gravavel: $file"
+    fi
+    return 0
+}
+
+for source_directory in app config routes resources vendor public; do
+    probe_directory_write "$source_directory"
+done
+probe_file_write composer.json
+probe_file_write routes/web.php
 
 mkdir -p \
     storage/app/public \
@@ -74,6 +100,8 @@ case "$action" in
             'source=read-only' 'runtime-data=ephemeral'
         ;;
     smoke) php artisan about --only=environment ;;
+    queue) php artisan queue:work --once --stop-when-empty --no-interaction ;;
+    scheduler) php artisan schedule:list ;;
     test) php artisan test --do-not-cache-result "$@" ;;
     *) abort "acao desconhecida; use verify, smoke ou test" ;;
 esac
