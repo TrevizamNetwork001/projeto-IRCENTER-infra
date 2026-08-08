@@ -1,0 +1,65 @@
+name: ircenter-isolated-tests
+
+x-test-environment: &test-environment
+  APP_ENV: testing
+  APP_DEBUG: "true"
+  APP_URL: http://localhost
+  IRCENTER_API_URL: http://127.0.0.1/testing-disabled
+  IRCENTER_API_TOKEN: ""
+  DB_CONNECTION: sqlite
+  DB_DATABASE: ":memory:"
+  DB_URL: ""
+  CACHE_STORE: array
+  SESSION_DRIVER: array
+  QUEUE_CONNECTION: sync
+  MAIL_MAILER: array
+  REDIS_HOST: disabled.invalid
+  REDIS_URL: ""
+  FINANCE_FISCAL_DB_CONNECTION: sqlite
+  FINANCE_FISCAL_DB_DATABASE: ":memory:"
+  FINANCE_FISCAL_DB_URL: ""
+  FINANCE_ENABLED: "false"
+  FINANCE_AUTOMATION_ENABLED: "false"
+  PAYMENT_PROVIDER: fake
+  PAYMENT_LIVE_ENABLED: "false"
+  PAYMENT_WEBHOOKS_ENABLED: "false"
+  FINANCE_GENERAL_EMAIL_FALLBACK: "false"
+  FISCAL_ENABLED: "false"
+  NFSE_PROVIDER: fake
+  NFSE_TRANSMISSION_ENABLED: "false"
+  NFSE_LIVE_ENABLED: "false"
+  EFI_ENVIRONMENT: homologation
+  LOG_CHANNEL: stderr
+  LOG_LEVEL: warning
+
+x-test-service: &test-service
+  network_mode: none
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /workspace/app/storage:rw,nosuid,size=128m,uid=33,gid=33,mode=0770
+    - /workspace/app/bootstrap/cache:rw,nosuid,size=32m,uid=33,gid=33,mode=0770
+  environment: *test-environment
+
+services:
+  app-test:
+    <<: *test-service
+    image: ircenter-app-test:h1
+    build:
+      context: .
+      dockerfile: docker/test/Dockerfile
+      args:
+        APPLICATION: app
+
+  documentation-test:
+    <<: *test-service
+    image: ircenter-documentation-test:h1
+    build:
+      context: .
+      dockerfile: docker/test/Dockerfile
+      args:
+        APPLICATION: documentation-app
