@@ -13,8 +13,8 @@ services:
       - ./app:/var/www/html:ro
       - ./documentation-app:/var/www/documentation:ro
       - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./certbot/www:/var/www/certbot:ro
-      - ./certbot/conf:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_conf:/etc/letsencrypt:ro
     networks:
       - frontend
       - backend
@@ -158,12 +158,16 @@ services:
     image: certbot/certbot:latest
     container_name: ircenter-certbot
     volumes:
-      - ./certbot/www:/var/www/certbot
-      - ./certbot/conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+      - certbot_conf:/etc/letsencrypt
 
 volumes:
   postgres_data:
   redis_data:
+  certbot_www:
+    name: ircenter_certbot_www
+  certbot_conf:
+    name: ircenter_certbot_conf
 
 networks:
   frontend:

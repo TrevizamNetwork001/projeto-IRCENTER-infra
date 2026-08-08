@@ -5,6 +5,7 @@
 # Operational data and sensitive material
 /backups/
 /certbot/
+certbot/conf/
 /data/
 /logs/
 /web/
