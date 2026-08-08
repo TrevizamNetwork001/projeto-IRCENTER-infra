@@ -1,0 +1,43 @@
+# Independent application repositories
+/app/
+/documentation-app/
+
+# Operational data and sensitive material
+/backups/
+/certbot/
+/data/
+/logs/
+/web/
+/storage/
+/postgres_data/
+/redis_data/
+
+# Dependencies and generated artifacts
+vendor/
+node_modules/
+bootstrap/cache/*.php
+storage/
+*.log
+*.tmp
+*.swp
+*~
+
+# Environment files and secrets
+.env
+.env.*
+*.env
+!*.env.example
+!**/*.env.example
+
+# Database dumps and operational backups
+*.sql
+*.sql.gz
+*.dump
+*.backup*
+*.bak
+
+# Private keys and certificate bundles
+*.pem
+*.key
+*.p12
+*.pfx

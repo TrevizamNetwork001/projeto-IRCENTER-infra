@@ -1,0 +1,170 @@
+services:
+  web:
+    image: nginx:alpine
+    container_name: ircenter-web
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_started
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./app:/var/www/html:ro
+      - ./documentation-app:/var/www/documentation:ro
+      - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+    networks:
+      - frontend
+      - backend
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: ircenter-app
+    restart: unless-stopped
+    working_dir: /var/www/html
+    volumes:
+      - ./app:/var/www/html
+    networks:
+      - backend
+
+  queue:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: ircenter-queue
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: php artisan queue:work --sleep=3 --tries=3 --timeout=90
+    volumes:
+      - ./app:/var/www/html
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: ircenter-scheduler
+    restart: unless-stopped
+    working_dir: /var/www/html
+    command: php artisan schedule:work
+    volumes:
+      - ./app:/var/www/html
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+
+  documentation-app:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: ircenter-documentation-app
+    restart: unless-stopped
+    working_dir: /var/www/documentation
+    volumes:
+      - ./documentation-app:/var/www/documentation
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+
+  documentation-queue:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: ircenter-documentation-queue
+    restart: unless-stopped
+    working_dir: /var/www/documentation
+    command: php artisan queue:work --sleep=3 --tries=3 --timeout=90
+    volumes:
+      - ./documentation-app:/var/www/documentation
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+
+  documentation-scheduler:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: ircenter-documentation-scheduler
+    restart: unless-stopped
+    working_dir: /var/www/documentation
+    command: php artisan schedule:work
+    volumes:
+      - ./documentation-app:/var/www/documentation
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backend
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: ircenter-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  redis:
+    image: redis:8-alpine
+    container_name: ircenter-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --maxmemory-policy
+      - noeviction
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: ircenter-certbot
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  frontend:
+  backend:
