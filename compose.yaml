@@ -35,9 +35,12 @@ services:
     container_name: ircenter-app
     restart: unless-stopped
     working_dir: /var/www/html
+    env_file:
+      - ./app/.env
     volumes:
       - app_storage:/var/www/html/storage
-      - app_cache:/var/www/html/bootstrap/cache
+    tmpfs:
+      - /var/www/html/bootstrap/cache:uid=33,gid=33,mode=0770
     depends_on:
       postgres:
         condition: service_healthy
@@ -59,10 +62,13 @@ services:
     container_name: ircenter-queue
     restart: unless-stopped
     working_dir: /var/www/html
+    env_file:
+      - ./app/.env
     command: /usr/local/bin/ircenter-queue-run
     volumes:
       - app_storage:/var/www/html/storage
-      - app_cache:/var/www/html/bootstrap/cache
+    tmpfs:
+      - /var/www/html/bootstrap/cache:uid=33,gid=33,mode=0770
     depends_on:
       postgres:
         condition: service_healthy
@@ -84,11 +90,14 @@ services:
     container_name: ircenter-scheduler
     restart: unless-stopped
     working_dir: /var/www/html
+    env_file:
+      - ./app/.env
     command: /usr/local/bin/ircenter-scheduler-run
     volumes:
       - ./app:/var/www/html:ro
       - app_storage:/var/www/html/storage
-      - app_cache:/var/www/html/bootstrap/cache
+    tmpfs:
+      - /var/www/html/bootstrap/cache:uid=33,gid=33,mode=0770
     depends_on:
       postgres:
         condition: service_healthy
@@ -110,9 +119,12 @@ services:
     container_name: ircenter-documentation-app
     restart: unless-stopped
     working_dir: /var/www/documentation
+    env_file:
+      - ./documentation-app/.env
     volumes:
       - documentation_storage:/var/www/documentation/storage
-      - documentation_cache:/var/www/documentation/bootstrap/cache
+    tmpfs:
+      - /var/www/documentation/bootstrap/cache:uid=33,gid=33,mode=0770
     depends_on:
       postgres:
         condition: service_healthy
@@ -132,10 +144,13 @@ services:
     container_name: ircenter-documentation-queue
     restart: unless-stopped
     working_dir: /var/www/documentation
+    env_file:
+      - ./documentation-app/.env
     command: /usr/local/bin/ircenter-queue-run
     volumes:
       - documentation_storage:/var/www/documentation/storage
-      - documentation_cache:/var/www/documentation/bootstrap/cache
+    tmpfs:
+      - /var/www/documentation/bootstrap/cache:uid=33,gid=33,mode=0770
     depends_on:
       postgres:
         condition: service_healthy
@@ -155,10 +170,13 @@ services:
     container_name: ircenter-documentation-scheduler
     restart: unless-stopped
     working_dir: /var/www/documentation
+    env_file:
+      - ./documentation-app/.env
     command: /usr/local/bin/ircenter-scheduler-run
     volumes:
       - documentation_storage:/var/www/documentation/storage
-      - documentation_cache:/var/www/documentation/bootstrap/cache
+    tmpfs:
+      - /var/www/documentation/bootstrap/cache:uid=33,gid=33,mode=0770
     depends_on:
       postgres:
         condition: service_healthy
@@ -225,12 +243,8 @@ volumes:
   redis_data:
   app_storage:
     name: ircenter_app_storage
-  app_cache:
-    name: ircenter_app_cache
   documentation_storage:
     name: ircenter_documentation_storage
-  documentation_cache:
-    name: ircenter_documentation_cache
   certbot_www:
     name: ircenter_certbot_www
   certbot_conf:
