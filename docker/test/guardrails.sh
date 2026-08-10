@@ -24,6 +24,7 @@ require_equal CACHE_STORE array
 require_equal SESSION_DRIVER array
 require_equal QUEUE_CONNECTION sync
 require_equal MAIL_MAILER array
+require_equal LOG_CHANNEL testing
 require_equal REDIS_HOST disabled.invalid
 require_empty REDIS_URL
 require_equal FINANCE_ENABLED false

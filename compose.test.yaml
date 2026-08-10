@@ -29,7 +29,7 @@ x-test-environment: &test-environment
   NFSE_TRANSMISSION_ENABLED: "false"
   NFSE_LIVE_ENABLED: "false"
   EFI_ENVIRONMENT: homologation
-  LOG_CHANNEL: stderr
+  LOG_CHANNEL: testing
   LOG_LEVEL: warning
 
 x-test-service: &test-service
