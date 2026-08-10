@@ -153,3 +153,27 @@ Laravel devem reportar UTC, o relógio de negócio deve reportar
 timezone explícito de cada tarefa. Em divergência, interromper a janela e
 restaurar a imagem/configuração anterior; não corrigir com UPDATE ou ALTER em
 produção.
+
+## 12. Imagem PHP mínima H10 — rebuild futuro controlado
+
+Esta seção é procedimento, não autorização de deploy.
+
+1. Executar o pré-check das seções 1 e 10 e confirmar backups recuperáveis.
+2. Guardar IDs, tamanhos e referências das imagens PHP atuais para rollback.
+3. Validar pins com `./scripts/check-container-images.sh` e contexto com
+   `./scripts/check-build-context.sh`.
+4. Construir localmente com `docker compose build --pull=false app`; nunca
+   executar pull implícito nem `composer update`.
+5. Comparar `docker image inspect`, `docker history`, `dpkg-query -W`, `php -m`
+   e o scanner `./scripts/check-php-runtime.sh IMAGEM`.
+6. Executar as duas suítes H1 e toda a stack H6 isolada antes da janela.
+7. Em janela aprovada, recriar de forma controlada apenas app, queue,
+   scheduler e os três serviços de documentação.
+8. Aguardar e validar todos os healthchecks, inclusive FastCGI e web.
+9. Validar `/up`, `/health/ready`, login e fixture autenticada sem acessar URL
+   pública fora da janela aprovada.
+10. Confirmar queue, scheduler, heartbeats, UTC/H8 e logs H9 (stderr, daily,
+    request ID, redaction e correlação NGINX).
+11. Se qualquer validação falhar, restaurar a imagem anterior e recriar apenas
+    esses seis serviços. Não apagar volumes, executar migrations ou alterar
+    dados no rollback.

@@ -36,7 +36,6 @@ services:
     restart: unless-stopped
     working_dir: /var/www/html
     volumes:
-      - ./app:/var/www/html:ro
       - app_storage:/var/www/html/storage
       - app_cache:/var/www/html/bootstrap/cache
     depends_on:
@@ -62,7 +61,6 @@ services:
     working_dir: /var/www/html
     command: /usr/local/bin/ircenter-queue-run
     volumes:
-      - ./app:/var/www/html:ro
       - app_storage:/var/www/html/storage
       - app_cache:/var/www/html/bootstrap/cache
     depends_on:
@@ -113,7 +111,6 @@ services:
     restart: unless-stopped
     working_dir: /var/www/documentation
     volumes:
-      - ./documentation-app:/var/www/documentation:ro
       - documentation_storage:/var/www/documentation/storage
       - documentation_cache:/var/www/documentation/bootstrap/cache
     depends_on:
@@ -137,7 +134,6 @@ services:
     working_dir: /var/www/documentation
     command: /usr/local/bin/ircenter-queue-run
     volumes:
-      - ./documentation-app:/var/www/documentation:ro
       - documentation_storage:/var/www/documentation/storage
       - documentation_cache:/var/www/documentation/bootstrap/cache
     depends_on:
@@ -161,7 +157,6 @@ services:
     working_dir: /var/www/documentation
     command: /usr/local/bin/ircenter-scheduler-run
     volumes:
-      - ./documentation-app:/var/www/documentation:ro
       - documentation_storage:/var/www/documentation/storage
       - documentation_cache:/var/www/documentation/bootstrap/cache
     depends_on:

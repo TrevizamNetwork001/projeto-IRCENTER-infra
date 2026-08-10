@@ -39,7 +39,22 @@ references=$(
     ' $files
 )
 
+stages=$(
+    awk '
+        /^[[:space:]]*FROM[[:space:]]+/ {
+            for (i = 1; i <= NF; i++) {
+                if (toupper($i) == "AS" && (i + 1) <= NF) print $(i + 1)
+            }
+        }
+    ' $files
+)
+
 for reference in $references; do
+    is_stage=0
+    for stage in $stages; do
+        [ "$reference" = "$stage" ] && is_stage=1
+    done
+    [ "$is_stage" -eq 0 ] || continue
     case "$reference" in
         *:latest|*:latest@*)
             report "tag latest: $reference"

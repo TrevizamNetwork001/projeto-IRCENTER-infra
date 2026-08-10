@@ -50,16 +50,12 @@ x-php-service: &php-service
   networks: [isolated]
 
 x-app-runtime: &app-runtime
-  volumes:
-    - ./app:/var/www/html:ro
   tmpfs:
     - /tmp:rw,noexec,nosuid,size=32m
     - /var/www/html/storage:rw,nosuid,size=64m,uid=33,gid=33,mode=0770
     - /var/www/html/bootstrap/cache:rw,nosuid,size=16m,uid=33,gid=33,mode=0770
 
 x-documentation-runtime: &documentation-runtime
-  volumes:
-    - ./documentation-app:/var/www/documentation:ro
   tmpfs:
     - /tmp:rw,noexec,nosuid,size=32m
     - /var/www/documentation/storage:rw,nosuid,size=64m,uid=33,gid=33,mode=0770

@@ -18,7 +18,7 @@ declarado no próprio repositório e não são obtidos de registry.
 | Certbot | `certbot/certbot:v5.7.0@sha256:34ee91…95b4` | `certbot 5.7.0` | Remove `latest`; nenhuma renovação executada |
 | PHP-FPM | `php:8.4.23-fpm-bookworm@sha256:c5fb7a…681c` | PHP 8.4.23 | Preserva PHP 8.4 e Debian Bookworm |
 | PHP CLI de testes | `php:8.4.23-cli-bookworm@sha256:5380a7…46f7` | Build H1 local | Mesma versão PHP da produção |
-| Composer | `composer:2.10.2@sha256:4d71c3…5040` | Composer 2.10.2 | Apenas estágio de build; lockfiles intactos |
+| Composer | `composer:2.10.2@sha256:4d71c3…5040` | Composer 2.10.2 | Apenas builder/test; nunca no runtime; lockfiles intactos |
 | PostgreSQL | `postgres:17.10-alpine@sha256:742f40…2193` | PostgreSQL 17.10 | Sem mudança de major ou formato de dados |
 | Redis | `redis:8.8.0-alpine@sha256:9d3171…7005` | Redis 8.8.0 | Mesmos bytes do container validado |
 
@@ -60,6 +60,12 @@ Não atualizar automaticamente. Para corrigir CVE ou adotar nova versão:
 Atualizações de segurança não autorizam salto automático de major. PostgreSQL
 jamais deve ser iniciado contra o volume real com nova major sem plano próprio.
 Composer não deve executar `update` durante troca de imagem.
+
+O runtime PHP H10 deve ser construído com `--pull=false`/`--pull never` quando
+suportado. O mesmo Dockerfile produz o estágio `build`, descartável, e o
+estágio final `runtime`; ambos preservam a referência PHP 8.4.23 Bookworm com
+digest completo. Alterar `FROM` exige atualizar simultaneamente este inventário
+e `scripts/check-container-images.sh`.
 
 ## Rollback
 
