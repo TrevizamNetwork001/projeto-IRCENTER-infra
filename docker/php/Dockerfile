@@ -8,6 +8,7 @@ RUN apt-get update \
         ca-certificates \
         curl \
         git \
+        libfcgi-bin \
         unzip \
         libicu-dev \
         libpq-dev \
@@ -26,6 +27,19 @@ RUN apt-get update \
 
 COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
 COPY docker/php/production.ini /usr/local/etc/php/conf.d/zz-ircenter-production.ini
+COPY docker/php/health-fpm.conf /usr/local/etc/php-fpm.d/zz-ircenter-health.conf
+COPY docker/health/heartbeat-write.sh /usr/local/bin/ircenter-heartbeat-write
+COPY docker/health/php-fpm-healthcheck.sh /usr/local/bin/ircenter-php-fpm-healthcheck
+COPY docker/health/heartbeat-healthcheck.sh /usr/local/bin/ircenter-heartbeat-healthcheck
+COPY docker/health/queue-run.sh /usr/local/bin/ircenter-queue-run
+COPY docker/health/scheduler-run.sh /usr/local/bin/ircenter-scheduler-run
+
+RUN chmod 0555 \
+        /usr/local/bin/ircenter-heartbeat-write \
+        /usr/local/bin/ircenter-php-fpm-healthcheck \
+        /usr/local/bin/ircenter-heartbeat-healthcheck \
+        /usr/local/bin/ircenter-queue-run \
+        /usr/local/bin/ircenter-scheduler-run
 
 WORKDIR /var/www/html
 

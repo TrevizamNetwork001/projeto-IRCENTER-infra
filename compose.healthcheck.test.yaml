@@ -1,0 +1,209 @@
+name: ircenter-h6-isolated
+
+x-app-environment: &app-environment
+  APP_ENV: testing
+  APP_DEBUG: "false"
+  APP_KEY: base64:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+  APP_URL: http://localhost
+  LOG_CHANNEL: stderr
+  DB_CONNECTION: pgsql
+  DB_HOST: postgres
+  DB_PORT: "5432"
+  DB_DATABASE: h6_health
+  DB_USERNAME: h6_health
+  DB_PASSWORD: h6_health_only
+  CACHE_STORE: array
+  SESSION_DRIVER: array
+  QUEUE_CONNECTION: sync
+  MAIL_MAILER: array
+  REDIS_HOST: redis
+  REDIS_PORT: "6379"
+  FINANCE_FISCAL_DB_CONNECTION: pgsql
+  FINANCE_FISCAL_DB_HOST: postgres
+  FINANCE_FISCAL_DB_DATABASE: h6_health
+  FINANCE_FISCAL_DB_USERNAME: h6_health
+  FINANCE_FISCAL_DB_PASSWORD: h6_health_only
+  FINANCE_ENABLED: "false"
+  FINANCE_AUTOMATION_ENABLED: "false"
+  PAYMENT_PROVIDER: fake
+  PAYMENT_LIVE_ENABLED: "false"
+  PAYMENT_WEBHOOKS_ENABLED: "false"
+  FISCAL_ENABLED: "false"
+  NFSE_PROVIDER: fake
+  NFSE_TRANSMISSION_ENABLED: "false"
+  NFSE_LIVE_ENABLED: "false"
+  IRCENTER_API_URL: http://127.0.0.1/testing-disabled
+  IRCENTER_API_TOKEN: ""
+
+x-php-service: &php-service
+  build:
+    context: .
+    dockerfile: docker/php/Dockerfile
+  image: ircenter-php-healthcheck:h6
+  read_only: true
+  user: www-data
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  environment: *app-environment
+  networks: [isolated]
+
+x-app-runtime: &app-runtime
+  volumes:
+    - ./app:/var/www/html:ro
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=32m
+    - /var/www/html/storage:rw,nosuid,size=64m,uid=33,gid=33,mode=0770
+    - /var/www/html/bootstrap/cache:rw,nosuid,size=16m,uid=33,gid=33,mode=0770
+
+x-documentation-runtime: &documentation-runtime
+  volumes:
+    - ./documentation-app:/var/www/documentation:ro
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=32m
+    - /var/www/documentation/storage:rw,nosuid,size=64m,uid=33,gid=33,mode=0770
+    - /var/www/documentation/bootstrap/cache:rw,nosuid,size=16m,uid=33,gid=33,mode=0770
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: h6_health
+      POSTGRES_USER: h6_health
+      POSTGRES_PASSWORD: h6_health_only
+    tmpfs: ["/var/lib/postgresql/data:rw,nosuid,size=128m"]
+    networks: [isolated]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U h6_health -d h6_health"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    tmpfs: ["/data:rw,nosuid,size=16m"]
+    networks: [isolated]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  app:
+    <<: [*php-service, *app-runtime]
+    working_dir: /var/www/html
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-php-fpm-healthcheck"]
+      interval: 2s
+      timeout: 5s
+      retries: 2
+      start_period: 10s
+
+  queue:
+    <<: [*php-service, *app-runtime]
+    working_dir: /var/www/html
+    command: /usr/local/bin/ircenter-queue-run
+    environment:
+      <<: *app-environment
+      IRCENTER_QUEUE_CYCLE_SECONDS: "2"
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-heartbeat-healthcheck", "queue", "8"]
+      interval: 2s
+      timeout: 2s
+      retries: 2
+      start_period: 5s
+
+  scheduler:
+    <<: [*php-service, *app-runtime]
+    working_dir: /var/www/html
+    command: /usr/local/bin/ircenter-scheduler-run
+    environment:
+      <<: *app-environment
+      IRCENTER_SCHEDULER_CYCLE_SECONDS: "2"
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-heartbeat-healthcheck", "scheduler", "8"]
+      interval: 2s
+      timeout: 2s
+      retries: 2
+      start_period: 5s
+
+  documentation-app:
+    <<: [*php-service, *documentation-runtime]
+    working_dir: /var/www/documentation
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-php-fpm-healthcheck"]
+      interval: 2s
+      timeout: 5s
+      retries: 2
+      start_period: 10s
+
+  documentation-queue:
+    <<: [*php-service, *documentation-runtime]
+    working_dir: /var/www/documentation
+    command: /usr/local/bin/ircenter-queue-run
+    environment:
+      <<: *app-environment
+      IRCENTER_QUEUE_CYCLE_SECONDS: "2"
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-heartbeat-healthcheck", "queue", "8"]
+      interval: 2s
+      timeout: 2s
+      retries: 2
+      start_period: 5s
+
+  documentation-scheduler:
+    <<: [*php-service, *documentation-runtime]
+    working_dir: /var/www/documentation
+    command: /usr/local/bin/ircenter-scheduler-run
+    environment:
+      <<: *app-environment
+      IRCENTER_SCHEDULER_CYCLE_SECONDS: "2"
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-heartbeat-healthcheck", "scheduler", "8"]
+      interval: 2s
+      timeout: 2s
+      retries: 2
+      start_period: 5s
+
+  web:
+    image: nginx:alpine
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - ./app:/var/www/html:ro
+      - ./docker/health/test/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./docker/health/nginx-healthcheck.sh:/usr/local/bin/ircenter-nginx-healthcheck:ro
+    tmpfs:
+      - /var/cache/nginx:rw,nosuid,size=16m
+      - /var/run:rw,nosuid,size=4m
+      - /tmp:rw,noexec,nosuid,size=8m
+    depends_on:
+      app: {condition: service_healthy}
+    networks: [isolated]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-nginx-healthcheck"]
+      interval: 2s
+      timeout: 4s
+      retries: 2
+      start_period: 10s
+
+networks:
+  isolated:
+    internal: true

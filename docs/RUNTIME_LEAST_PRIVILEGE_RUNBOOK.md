@@ -97,3 +97,49 @@ Este rollback também é somente manual. Não apagar volumes nem dados; manter o
 ## 9. Encerramento
 
 Guardar configuração Compose, inspeções, evidências de UID 33, smoke HTTP, testes de escrita negativa e resultados das suítes. A mudança só fica implantada após aprovação do responsável pelo host.
+
+## 10. Healthchecks H6 — implantação futura
+
+Não executar fora de janela controlada. Antes do rebuild, confirmar checkout,
+estado atual, restart counts e configuração:
+
+```bash
+cd /opt/ircenter
+git -c safe.directory=/opt/ircenter status --short
+docker compose config --quiet
+docker compose ps
+docker inspect ircenter-app ircenter-queue ircenter-scheduler ircenter-web \
+  --format '{{.Name}} id={{.Id}} restart={{.RestartCount}} health={{json .State.Health}}'
+```
+
+Gerar o snapshot descrito na seção 2. O deploy controlado da H6 requer rebuild
+local da imagem PHP e recriação somente dos serviços afetados:
+
+```bash
+docker compose build app queue scheduler documentation-app documentation-queue documentation-scheduler
+docker compose up -d --no-deps --force-recreate app documentation-app
+docker compose up -d --no-deps --force-recreate queue scheduler documentation-queue documentation-scheduler
+docker compose up -d --no-deps --force-recreate web
+```
+
+Validar sem imprimir secrets:
+
+```bash
+docker compose config --quiet
+docker compose ps
+docker exec ircenter-web nginx -t
+docker inspect --format '{{json .State.Health}}' ircenter-app
+docker inspect --format '{{json .State.Health}}' ircenter-web
+docker exec ircenter-queue /usr/local/bin/ircenter-heartbeat-healthcheck queue 150
+docker exec ircenter-scheduler /usr/local/bin/ircenter-heartbeat-healthcheck scheduler 180
+curl -fsS https://HOST/health/ready
+```
+
+Esperar pelo menos um ciclo completo de queue e scheduler. Verificar ownership
+`33:33`, diretório `0750` e arquivos `0640` sob `storage/app/health`. Não
+alterar os heartbeats manualmente em produção.
+
+Se um serviço ficar unhealthy, preservar `docker inspect`, logs e timestamps.
+O rollback usa o snapshot da seção 2: restaurar Compose/imagem anteriores e
+recriar somente os serviços H6, sem apagar volumes. Validar novamente FPM,
+readiness, queue, scheduler e NGINX antes de encerrar a janela.

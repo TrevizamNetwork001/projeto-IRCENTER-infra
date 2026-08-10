@@ -5,7 +5,9 @@ services:
     restart: unless-stopped
     depends_on:
       app:
-        condition: service_started
+        condition: service_healthy
+      documentation-app:
+        condition: service_healthy
     ports:
       - "80:80"
       - "443:443"
@@ -13,11 +15,18 @@ services:
       - ./app:/var/www/html:ro
       - ./documentation-app:/var/www/documentation:ro
       - ./docker/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./docker/health/nginx-healthcheck.sh:/usr/local/bin/ircenter-nginx-healthcheck:ro
       - certbot_www:/var/www/certbot:ro
       - certbot_conf:/etc/letsencrypt:ro
     networks:
       - frontend
       - backend
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-nginx-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   app:
     build:
@@ -30,8 +39,19 @@ services:
       - ./app:/var/www/html:ro
       - app_storage:/var/www/html/storage
       - app_cache:/var/www/html/bootstrap/cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - backend
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-php-fpm-healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   queue:
     build:
@@ -40,7 +60,7 @@ services:
     container_name: ircenter-queue
     restart: unless-stopped
     working_dir: /var/www/html
-    command: php artisan queue:work --sleep=3 --tries=3 --timeout=90
+    command: /usr/local/bin/ircenter-queue-run
     volumes:
       - ./app:/var/www/html:ro
       - app_storage:/var/www/html/storage
@@ -52,6 +72,12 @@ services:
         condition: service_healthy
     networks:
       - backend
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-heartbeat-healthcheck", "queue", "150"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   scheduler:
     build:
@@ -60,7 +86,7 @@ services:
     container_name: ircenter-scheduler
     restart: unless-stopped
     working_dir: /var/www/html
-    command: php artisan schedule:work
+    command: /usr/local/bin/ircenter-scheduler-run
     volumes:
       - ./app:/var/www/html:ro
       - app_storage:/var/www/html/storage
@@ -72,6 +98,12 @@ services:
         condition: service_healthy
     networks:
       - backend
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-heartbeat-healthcheck", "scheduler", "180"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
 
   documentation-app:
     build:
@@ -89,6 +121,12 @@ services:
         condition: service_healthy
     networks:
       - backend
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-php-fpm-healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   documentation-queue:
     build:
@@ -97,7 +135,7 @@ services:
     container_name: ircenter-documentation-queue
     restart: unless-stopped
     working_dir: /var/www/documentation
-    command: php artisan queue:work --sleep=3 --tries=3 --timeout=90
+    command: /usr/local/bin/ircenter-queue-run
     volumes:
       - ./documentation-app:/var/www/documentation:ro
       - documentation_storage:/var/www/documentation/storage
@@ -107,6 +145,12 @@ services:
         condition: service_healthy
     networks:
       - backend
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-heartbeat-healthcheck", "queue", "150"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   documentation-scheduler:
     build:
@@ -115,7 +159,7 @@ services:
     container_name: ircenter-documentation-scheduler
     restart: unless-stopped
     working_dir: /var/www/documentation
-    command: php artisan schedule:work
+    command: /usr/local/bin/ircenter-scheduler-run
     volumes:
       - ./documentation-app:/var/www/documentation:ro
       - documentation_storage:/var/www/documentation/storage
@@ -125,6 +169,12 @@ services:
         condition: service_healthy
     networks:
       - backend
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-heartbeat-healthcheck", "scheduler", "180"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
 
   postgres:
     image: postgres:17-alpine
@@ -143,6 +193,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 20s
     networks:
       - backend
 
@@ -163,6 +214,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 10s
     networks:
       - backend
 
