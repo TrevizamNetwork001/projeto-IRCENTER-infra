@@ -143,3 +143,13 @@ Se um serviço ficar unhealthy, preservar `docker inspect`, logs e timestamps.
 O rollback usa o snapshot da seção 2: restaurar Compose/imagem anteriores e
 recriar somente os serviços H6, sem apagar volumes. Validar novamente FPM,
 readiness, queue, scheduler e NGINX antes de encerrar a janela.
+
+## 11. Timezone H8 — verificação futura
+
+A implantação da H8 não converte dados. Após rebuild controlado, executar apenas
+as verificações read-only documentadas em `docs/TIMEZONE_POLICY.md`: PHP e
+Laravel devem reportar UTC, o relógio de negócio deve reportar
+`America/Sao_Paulo`, PostgreSQL deve reportar UTC e o scheduler deve mostrar o
+timezone explícito de cada tarefa. Em divergência, interromper a janela e
+restaurar a imagem/configuração anterior; não corrigir com UPDATE ou ALTER em
+produção.
