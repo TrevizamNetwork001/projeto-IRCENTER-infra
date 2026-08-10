@@ -6,8 +6,10 @@ default_files="
 $root_dir/compose.yaml
 $root_dir/compose.test.yaml
 $root_dir/compose.healthcheck.test.yaml
+$root_dir/compose.e2e.test.yaml
 $root_dir/docker/php/Dockerfile
 $root_dir/docker/test/Dockerfile
+$root_dir/docker/e2e/Dockerfile
 "
 if [ "$#" -gt 0 ]; then
     files="$*"

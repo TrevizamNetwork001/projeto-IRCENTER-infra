@@ -1,0 +1,181 @@
+name: ircenter-e2e-tests
+
+x-e2e-environment: &e2e-environment
+  APP_ENV: e2e
+  APP_DEBUG: "false"
+  APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+  APP_URL: http://e2e-web:8080
+  BUSINESS_TIMEZONE: America/Sao_Paulo
+  DB_CONNECTION: pgsql
+  DB_HOST: e2e-postgres
+  DB_PORT: "5432"
+  DB_DATABASE: ircenter_e2e
+  DB_USERNAME: ircenter_e2e
+  DB_PASSWORD: e2e-database-password
+  DB_SSLMODE: disable
+  CACHE_STORE: redis
+  SESSION_DRIVER: database
+  QUEUE_CONNECTION: sync
+  REDIS_HOST: e2e-redis
+  REDIS_PORT: "6379"
+  REDIS_PASSWORD: ""
+  MAIL_MAILER: array
+  LOG_CHANNEL: stderr
+  LOG_LEVEL: warning
+  FINANCE_FISCAL_DB_CONNECTION: pgsql
+  FINANCE_FISCAL_DB_HOST: e2e-postgres
+  FINANCE_FISCAL_DB_PORT: "5432"
+  FINANCE_FISCAL_DB_DATABASE: ircenter_e2e_finance
+  FINANCE_FISCAL_DB_USERNAME: ircenter_e2e
+  FINANCE_FISCAL_DB_PASSWORD: e2e-database-password
+  FINANCE_FISCAL_DB_SSLMODE: disable
+  FINANCE_ENABLED: "true"
+  FINANCE_AUTOMATION_ENABLED: "false"
+  PAYMENT_PROVIDER: fake
+  PAYMENT_LIVE_ENABLED: "false"
+  PAYMENT_WEBHOOKS_ENABLED: "false"
+  FINANCE_GENERAL_EMAIL_FALLBACK: "false"
+  FISCAL_ENABLED: "false"
+  NFSE_PROVIDER: fake
+  NFSE_TRANSMISSION_ENABLED: "false"
+  NFSE_LIVE_ENABLED: "false"
+  EFI_ENVIRONMENT: homologation
+  EFI_CLIENT_ID: ""
+  EFI_CLIENT_SECRET: ""
+  EFI_NOTIFICATION_URL: ""
+  IRCENTER_API_URL: http://disabled.invalid
+  IRCENTER_API_TOKEN: ""
+
+x-app-security: &app-security
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
+services:
+  e2e-postgres:
+    image: postgres:17.10-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+    environment:
+      POSTGRES_DB: ircenter_e2e
+      POSTGRES_USER: ircenter_e2e
+      POSTGRES_PASSWORD: e2e-database-password
+    tmpfs:
+      - /var/lib/postgresql/data:rw,nosuid,nodev,size=512m
+    volumes:
+      - ./docker/e2e/init-finance-db.sh:/docker-entrypoint-initdb.d/10-finance-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ircenter_e2e -d ircenter_e2e"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [e2e]
+
+  e2e-redis:
+    image: redis:8.8.0-alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    tmpfs:
+      - /data:rw,nosuid,nodev,size=64m
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    networks: [e2e]
+
+  e2e-init:
+    image: ircenter-e2e-app:h11
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    <<: *app-security
+    working_dir: /var/www/html
+    environment: *e2e-environment
+    command:
+      - sh
+      - -euc
+      - |
+        php artisan migrate:fresh --force
+        php artisan migrate:fresh --database=finance_fiscal --path=database/migrations/finance_fiscal --force
+        php artisan db:seed --class=Database\\Seeders\\E2eSeeder --force
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+      - /var/www/html/storage:rw,nosuid,nodev,size=128m,uid=33,gid=33,mode=0770
+      - /var/www/html/bootstrap/cache:rw,nosuid,nodev,size=32m,uid=33,gid=33,mode=0770
+    depends_on:
+      e2e-postgres: { condition: service_healthy }
+      e2e-redis: { condition: service_healthy }
+    networks: [e2e]
+
+  e2e-app:
+    image: ircenter-e2e-app:h11
+    <<: *app-security
+    working_dir: /var/www/html
+    environment: *e2e-environment
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=32m
+      - /var/www/html/storage:rw,nosuid,nodev,size=128m,uid=33,gid=33,mode=0770
+      - /var/www/html/bootstrap/cache:rw,nosuid,nodev,size=32m,uid=33,gid=33,mode=0770
+    depends_on:
+      e2e-init: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-php-fpm-healthcheck"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    networks: [e2e]
+
+  e2e-web:
+    image: nginx:1.31.3-alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    volumes:
+      - ./app:/var/www/html:ro
+      - ./docker/e2e/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    tmpfs:
+      - /var/cache/nginx:rw,nosuid,nodev,size=16m
+      - /var/run:rw,nosuid,nodev,size=4m
+      - /tmp:rw,noexec,nosuid,size=8m
+    depends_on:
+      e2e-app: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    networks: [e2e]
+
+  e2e-runner:
+    image: ircenter-e2e-runner:h11
+    build:
+      context: .
+      dockerfile: docker/e2e/Dockerfile
+    init: true
+    user: "1000:1000"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      <<: *e2e-environment
+      BASE_URL: http://e2e-web:8080
+      HOME: /tmp
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,size=128m,uid=1000,gid=1000,mode=0700
+    volumes:
+      - ./tests/e2e/artifacts:/artifacts
+    depends_on:
+      e2e-web: { condition: service_healthy }
+    networks: [e2e]
+
+networks:
+  e2e:
+    internal: true

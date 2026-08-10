@@ -1,0 +1,16 @@
+{
+  "name": "ircenter-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": "22.18.0"
+  },
+  "scripts": {
+    "test": "playwright test",
+    "test:guardrails": "playwright test guardrails.spec.js"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.10.2",
+    "@playwright/test": "1.55.0"
+  }
+}

@@ -21,6 +21,7 @@ declarado no próprio repositório e não são obtidos de registry.
 | Composer | `composer:2.10.2@sha256:4d71c3…5040` | Composer 2.10.2 | Apenas builder/test; nunca no runtime; lockfiles intactos |
 | PostgreSQL | `postgres:17.10-alpine@sha256:742f40…2193` | PostgreSQL 17.10 | Sem mudança de major ou formato de dados |
 | Redis | `redis:8.8.0-alpine@sha256:9d3171…7005` | Redis 8.8.0 | Mesmos bytes do container validado |
+| Playwright E2E | `mcr.microsoft.com/playwright:v1.55.0-noble@sha256:b27e71…fb29` | Playwright 1.55.0, Node 22.18.0, Ubuntu Noble | Runner H11 separado do PHP |
 
 Os digests completos ficam nos arquivos de configuração, sem abreviação.
 `alpine:3.22` aparece apenas em comandos manuais dos runbooks H2/H3. É uma tag
@@ -39,10 +40,15 @@ Executar antes de commit ou release:
 ./scripts/check-container-images.sh
 docker compose config --quiet
 docker compose -p ircenter-h6-isolated -f compose.healthcheck.test.yaml config --quiet
+docker compose -p ircenter-e2e-tests -f compose.e2e.test.yaml config --quiet
 ```
 
 O scanner é somente leitura, não consulta registry e falha para `latest`, tags
 genéricas conhecidas, digest inválido ou imagem externa ativa sem digest.
+
+O runner H11 segue a mesma regra: tag legível e digest fixam o Playwright. Node
+e Chromium existem somente na imagem dedicada. Dependências npm são fixadas no
+`package.json` e verificadas pelo `package-lock.json` com `npm ci`.
 
 ## Atualização controlada e CVEs
 

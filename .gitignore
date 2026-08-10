@@ -19,6 +19,8 @@ node_modules/
 bootstrap/cache/*.php
 storage/
 *.log
+tests/e2e/artifacts/*
+!tests/e2e/artifacts/.gitignore
 *.tmp
 *.swp
 *~
