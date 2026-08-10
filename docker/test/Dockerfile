@@ -1,4 +1,4 @@
-FROM php:8.4-cli-bookworm
+FROM php:8.4.23-cli-bookworm@sha256:5380a7dd17b978cd14fb2c84cd67ddc47adaf079b240f8138224bbadefae46f7
 
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -17,7 +17,7 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+COPY --from=composer:2.10.2@sha256:4d71c3c2109c61d5415544264b59ad4087e4c5b7244481723664138fd36d5040 /usr/bin/composer /usr/local/bin/composer
 ARG APPLICATION
 
 WORKDIR /workspace/app
