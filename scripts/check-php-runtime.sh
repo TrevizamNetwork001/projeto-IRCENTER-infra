@@ -24,7 +24,7 @@ for present in php php-fpm cgi-fcgi; do
     command -v "$present" >/dev/null 2>&1 || fail "$present ausente no runtime"
 done
 modules=$(php -m)
-for module in bcmath intl pcntl pdo_pgsql redis zip; do
+for module in bcmath curl intl pcntl pdo_pgsql redis zip; do
     printf "%s\n" "$modules" | grep -Fxi "$module" >/dev/null || fail "extensao $module ausente"
 done
 printf "%s\n" "$modules" | grep -Fxi "Zend OPcache" >/dev/null || fail "extensao opcache ausente"

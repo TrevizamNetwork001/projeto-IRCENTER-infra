@@ -7,6 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         git \
+        libcurl4-openssl-dev \
         libicu-dev \
         libpq-dev \
         libzip-dev \
@@ -15,6 +16,7 @@ RUN apt-get update \
     && docker-php-ext-enable redis \
     && docker-php-ext-install -j"$(nproc)" \
         bcmath \
+        curl \
         intl \
         opcache \
         pcntl \
@@ -50,6 +52,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         libfcgi-bin \
+        libcurl4 \
         libicu72 \
         libpq5 \
         libzip4 \
