@@ -47,7 +47,7 @@ Rollback: remover a candidata somente depois da janela; manter/selecionar a imag
 
 ### D — Validar stack isolada
 
-Executar suítes PHP, stack H6 e E2E contra a candidata, com providers fake, rede isolada e bancos descartáveis. Validar 317 testes PHP, 1.074 asserções, Playwright sem falhas, Axe serious/critical zero e CSP violations zero.
+Executar suítes PHP, stack H6 e E2E contra a candidata, com providers fake, rede isolada e bancos descartáveis. Validar 319 testes PHP, 1.079 asserções, Playwright sem falhas, Axe serious/critical zero e CSP violations zero.
 
 Rollback: remover somente os recursos do projeto isolado.
 
@@ -58,6 +58,24 @@ Rollback: remover somente os recursos do projeto isolado.
 3. Checkpoint: GO somente se app e documentation conseguirem criar/remover fixture inócua em storage/cache como 33:33.
 
 Rollback: recolocar a definição e os mounts anteriores registrados; preservar o volume anterior até aceite final.
+
+Residual conhecido: o Blade cria views compiladas com `0777 - umask()` e a
+umask produtiva resulta em `0755`. Isso não exige executabilidade e foi
+classificado como **RESIDUAL LOW RISK — DEPLOY-TIME NORMALIZATION**. Não mudar
+a umask global nem corrigir arquivos históricos durante DEPLOY-1A. Em cada
+deploy, depois do recreate do app e antes da liberação do web, executar:
+
+```bash
+docker exec ircenter-app php artisan view:cache
+docker exec ircenter-app /usr/local/bin/ircenter-normalize-compiled-views
+docker exec ircenter-documentation-app php artisan view:cache
+docker exec ircenter-documentation-app /usr/local/bin/ircenter-normalize-compiled-views
+```
+
+O normalizador atua somente nos `*.php` diretamente em
+`storage/framework/views`, rejeita symlinks/tipos inesperados e não percorre
+outras áreas de storage. O canal Monolog `daily` dos dois aplicativos configura
+`0640` diretamente; seus testes isolados devem passar antes do deploy.
 
 ### F — Recreate controlado dos serviços PHP
 

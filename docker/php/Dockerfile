@@ -79,6 +79,7 @@ COPY docker/health/heartbeat-healthcheck.sh /usr/local/bin/ircenter-heartbeat-he
 COPY docker/health/queue-run.sh /usr/local/bin/ircenter-queue-run
 COPY docker/health/scheduler-run.sh /usr/local/bin/ircenter-scheduler-run
 COPY docker/php/runtime-entrypoint.sh /usr/local/bin/ircenter-runtime-entrypoint
+COPY docker/php/normalize-compiled-views.sh /usr/local/bin/ircenter-normalize-compiled-views
 COPY --from=build /build/app/ /var/www/html/
 COPY --from=build /build/documentation/ /var/www/documentation/
 
@@ -88,6 +89,7 @@ RUN chmod 0555 \
         /usr/local/bin/ircenter-heartbeat-healthcheck \
         /usr/local/bin/ircenter-queue-run \
         /usr/local/bin/ircenter-scheduler-run \
+        /usr/local/bin/ircenter-normalize-compiled-views \
         /usr/local/bin/ircenter-runtime-entrypoint \
     && find /var/www/html /var/www/documentation -xdev -type d -exec chmod 0755 {} + \
     && find /var/www/html /var/www/documentation -xdev -type f -exec chmod 0644 {} + \

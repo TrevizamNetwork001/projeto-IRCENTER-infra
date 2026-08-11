@@ -60,6 +60,22 @@ O teste confinado comprovou umask 077, diretórios 0700, arquivos 0600, recusa d
 
 ## 9. CSP e readiness
 
+### Residual de modos em storage
+
+A auditoria DEPLOY-1A 7A identificou somente 25 views Blade compiladas em
+`0755` e um log diário em `0644`; não havia uploads, relatórios, dados privados
+ou scripts desconhecidos no conjunto divergente. PHP e Monolog foram validados
+com `0640` em fixture isolada. O estado histórico não bloqueia DEPLOY-1A e não
+deve receber `chmod` pontual nesta fase.
+
+O log `daily` dos dois aplicativos passa a solicitar `0640` pela configuração
+suportada do Laravel, com testes que criam logs novos e verificam o modo real.
+Para views, o comportamento do framework (`0777 - umask()`) não oferece modo
+específico sem afetar globalmente outros arquivos/diretórios. Classificação:
+**RESIDUAL LOW RISK — DEPLOY-TIME NORMALIZATION**. Cada deploy deve executar
+`view:cache` e o normalizador restrito aos PHP compilados antes de liberar o
+web. Correção real exige checkpoint, snapshot e rollback do DEPLOY-1B.
+
 CSP permanece exclusivamente `Content-Security-Policy-Report-Only`: sem `unsafe-eval`, `unsafe-inline` ou wildcard global; nonce por request; `script-src-attr 'none'` e `style-src-attr 'none'`. E2E: zero violações. Readiness expõe somente `{"status":"ready"}`/`{"status":"unavailable"}`, sem Set-Cookie, XSRF, session, database, redis, timestamp, hostname, version ou exception. `/system-diagnostic` exige autenticação e administração.
 
 ## 10. Imagens, timezone e logging
