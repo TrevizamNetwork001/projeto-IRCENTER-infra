@@ -94,7 +94,6 @@ services:
       - ./app/.env
     command: /usr/local/bin/ircenter-scheduler-run
     volumes:
-      - ./app:/var/www/html:ro
       - app_storage:/var/www/html/storage
     tmpfs:
       - /var/www/html/bootstrap/cache:uid=33,gid=33,mode=0770
