@@ -12,6 +12,6 @@ test('layout nao tem overflow global e acoes permanecem alcancaveis', async ({ m
     const menu = page.getByRole('button', { name: 'Abrir menu principal' });
     await expect(menu).toBeVisible();
     await menu.click();
-    await expect(page.getByRole('link', { name: 'Clientes' })).toBeVisible();
+    await expect(page.getByLabel('Navegação principal').getByRole('link', { name: 'Clientes' })).toBeVisible();
   }
 });
