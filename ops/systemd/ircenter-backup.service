@@ -1,0 +1,27 @@
+[Unit]
+Description=Backup verificável do IRCENTER
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=ircenter-backup
+Group=ircenter-backup
+SupplementaryGroups=docker
+EnvironmentFile=/etc/ircenter/backup.env
+Environment=DOCKER_CONFIG=/var/lib/ircenter/docker-config
+ExecStart=/opt/ircenter/scripts/backup-all.sh backup
+TimeoutStartSec=30min
+StateDirectory=ircenter
+StateDirectoryMode=0700
+RuntimeDirectory=ircenter-backup
+RuntimeDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/ircenter /var/lib/ircenter /run/ircenter-backup
+
+[Install]
+WantedBy=multi-user.target
