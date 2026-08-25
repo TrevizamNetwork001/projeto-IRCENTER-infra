@@ -1,0 +1,205 @@
+name: ircenter
+
+x-core-image: &core-image
+  image: ircenter-core:${RELEASE_VERSION:?RELEASE_VERSION required}
+
+x-documentation-image: &documentation-image
+  image: ircenter-documentation:${RELEASE_VERSION:?RELEASE_VERSION required}
+
+services:
+  web:
+    image: ircenter-web:${RELEASE_VERSION:?RELEASE_VERSION required}
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile.release
+      args:
+        INFRA_COMMIT: ${INFRA_COMMIT:?INFRA_COMMIT required}
+        CORE_COMMIT: ${CORE_COMMIT:?CORE_COMMIT required}
+        DOCUMENTATION_COMMIT: ${DOCUMENTATION_COMMIT:?DOCUMENTATION_COMMIT required}
+        RELEASE_VERSION: ${RELEASE_VERSION}
+        BUILD_DATE: ${BUILD_DATE:?BUILD_DATE required}
+        REPOSITORY: ${INFRA_REPOSITORY:?INFRA_REPOSITORY required}
+        SOURCE_TREE_DIGEST: ${SOURCE_TREE_DIGEST:?SOURCE_TREE_DIGEST required}
+    restart: unless-stopped
+    depends_on:
+      app: {condition: service_healthy}
+      documentation-app: {condition: service_healthy}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./certbot/www:/var/www/certbot:ro
+      - ./certbot/conf:/etc/letsencrypt:ro
+    networks: [frontend, backend]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-nginx-healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  app:
+    <<: *core-image
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.release
+      args:
+        APPLICATION: app
+        APP_DEST: /var/www/html
+        GIT_COMMIT: ${CORE_COMMIT:?CORE_COMMIT required}
+        RELEASE_VERSION: ${RELEASE_VERSION}
+        BUILD_DATE: ${BUILD_DATE:?BUILD_DATE required}
+        REPOSITORY: ${CORE_REPOSITORY:?CORE_REPOSITORY required}
+        SOURCE_TREE_DIGEST: ${CORE_SOURCE_TREE_DIGEST:?CORE_SOURCE_TREE_DIGEST required}
+    restart: unless-stopped
+    working_dir: /var/www/html
+    env_file: [./app/.env]
+    volumes: [app_storage:/var/www/html/storage]
+    tmpfs: [/var/www/html/bootstrap/cache:uid=33,gid=33,mode=0770]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-php-fpm-healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  queue:
+    <<: *core-image
+    restart: unless-stopped
+    working_dir: /var/www/html
+    env_file: [./app/.env]
+    command: /usr/local/bin/ircenter-queue-run
+    volumes: [app_storage:/var/www/html/storage]
+    tmpfs: [/var/www/html/bootstrap/cache:uid=33,gid=33,mode=0770]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-heartbeat-healthcheck", "queue", "150"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  scheduler:
+    <<: *core-image
+    restart: unless-stopped
+    working_dir: /var/www/html
+    env_file: [./app/.env]
+    command: /usr/local/bin/ircenter-scheduler-run
+    volumes: [app_storage:/var/www/html/storage]
+    tmpfs: [/var/www/html/bootstrap/cache:uid=33,gid=33,mode=0770]
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-heartbeat-healthcheck", "scheduler", "180"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+
+  documentation-app:
+    <<: *documentation-image
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile.release
+      args:
+        APPLICATION: documentation-app
+        APP_DEST: /var/www/documentation
+        GIT_COMMIT: ${DOCUMENTATION_COMMIT:?DOCUMENTATION_COMMIT required}
+        RELEASE_VERSION: ${RELEASE_VERSION}
+        BUILD_DATE: ${BUILD_DATE:?BUILD_DATE required}
+        REPOSITORY: ${DOCUMENTATION_REPOSITORY:?DOCUMENTATION_REPOSITORY required}
+        SOURCE_TREE_DIGEST: ${DOCUMENTATION_SOURCE_TREE_DIGEST:?DOCUMENTATION_SOURCE_TREE_DIGEST required}
+    restart: unless-stopped
+    working_dir: /var/www/documentation
+    env_file: [./documentation-app/.env]
+    volumes: [documentation_storage:/var/www/documentation/storage]
+    tmpfs: [/var/www/documentation/bootstrap/cache:uid=33,gid=33,mode=0770]
+    depends_on:
+      postgres: {condition: service_healthy}
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-php-fpm-healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  documentation-queue:
+    <<: *documentation-image
+    restart: unless-stopped
+    working_dir: /var/www/documentation
+    env_file: [./documentation-app/.env]
+    command: /usr/local/bin/ircenter-queue-run
+    volumes: [documentation_storage:/var/www/documentation/storage]
+    tmpfs: [/var/www/documentation/bootstrap/cache:uid=33,gid=33,mode=0770]
+    depends_on: {postgres: {condition: service_healthy}}
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-heartbeat-healthcheck", "queue", "150"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  documentation-scheduler:
+    <<: *documentation-image
+    restart: unless-stopped
+    working_dir: /var/www/documentation
+    env_file: [./documentation-app/.env]
+    command: /usr/local/bin/ircenter-scheduler-run
+    volumes: [documentation_storage:/var/www/documentation/storage]
+    tmpfs: [/var/www/documentation/bootstrap/cache:uid=33,gid=33,mode=0770]
+    depends_on: {postgres: {condition: service_healthy}}
+    networks: [backend]
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/ircenter-heartbeat-healthcheck", "scheduler", "180"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 90s
+
+  postgres:
+    image: postgres:17.10-alpine@sha256:742f40ea20b9ff2ff31db5458d127452988a2164df9e17441e191f3b72252193
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks: [backend]
+
+  redis:
+    image: redis:8.8.0-alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005
+    restart: unless-stopped
+    command: [redis-server, --appendonly, "yes", --maxmemory-policy, noeviction]
+    volumes: [redis_data:/data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    networks: [backend]
+
+volumes:
+  postgres_data:
+  redis_data:
+  app_storage: {name: ircenter_app_storage}
+  documentation_storage: {name: ircenter_documentation_storage}
+
+networks:
+  frontend:
+  backend:

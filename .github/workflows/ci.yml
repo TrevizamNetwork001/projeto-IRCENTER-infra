@@ -1,0 +1,55 @@
+name: IRCENTER CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ircenter-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  isolated-suite:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      FINANCE_ENABLED: "false"
+      PAYMENT_PROVIDER: fake
+      PAYMENT_LIVE_ENABLED: "false"
+      PAYMENT_WEBHOOKS_ENABLED: "false"
+      FINANCE_AUTOMATION_ENABLED: "false"
+      FISCAL_ENABLED: "false"
+      FISCAL_PROVIDER: fake
+      NFSE_PROVIDER: fake
+      NFSE_TRANSMISSION_ENABLED: "false"
+      NFSE_LIVE_ENABLED: "false"
+      EFI_ENVIRONMENT: homologation
+    steps:
+      - name: Checkout infrastructure
+        uses: actions/checkout@v4
+
+      - name: Require repository mapping
+        env:
+          CORE_REPOSITORY: ${{ vars.CORE_REPOSITORY }}
+          DOCUMENTATION_REPOSITORY: ${{ vars.DOCUMENTATION_REPOSITORY }}
+        run: |
+          test -n "$CORE_REPOSITORY"
+          test -n "$DOCUMENTATION_REPOSITORY"
+
+      - name: Checkout Core
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.CORE_REPOSITORY }}
+          path: app
+
+      - name: Checkout Documentation
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ vars.DOCUMENTATION_REPOSITORY }}
+          path: documentation-app
+
+      - name: Run isolated release gates
+        run: ./scripts/ci-local.sh
