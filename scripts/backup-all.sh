@@ -128,14 +128,38 @@ backup_all() {
     log "backup completo concluido; artifacts=5 bytes=$total"
 }
 
+retention_eligible_dirs() {
+    local tier=$1 days dir
+    case "$tier" in daily) days=14 ;; weekly) days=90 ;; monthly) days=730 ;; esac
+    dir="$BACKUP_ROOT/releases/$tier"
+    [[ -d "$dir" ]] || return 0
+    find -P "$dir" -mindepth 1 -maxdepth 1 -type d -mtime "+$days"
+}
+
 retention_dry_run() {
-    local tier days dir count
+    local tier days count
     for tier in daily weekly monthly; do
         case "$tier" in daily) days=14 ;; weekly) days=90 ;; monthly) days=730 ;; esac
-        dir="$BACKUP_ROOT/releases/$tier"
-        count=0
-        [[ ! -d "$dir" ]] || count=$(find -P "$dir" -mindepth 1 -maxdepth 1 -type d -mtime "+$days" | wc -l)
+        count=$(retention_eligible_dirs "$tier" | wc -l)
         printf 'tier=%s retention_days=%s eligible_directories=%s action=none\n' "$tier" "$days" "$count"
+    done
+}
+
+retention_apply() {
+    local tier days removed release
+    for tier in daily weekly monthly; do
+        case "$tier" in daily) days=14 ;; weekly) days=90 ;; monthly) days=730 ;; esac
+        removed=0
+        while IFS= read -r release; do
+            [[ -n "$release" ]] || continue
+            # so remove diretorios dentro de BACKUP_ROOT/releases/<tier>,
+            # nunca um symlink ou caminho fora da raiz de backups.
+            [[ "$release" == "$BACKUP_ROOT/releases/$tier/"* ]] || continue
+            [[ ! -L "$release" ]] || continue
+            rm -rf -- "$release"
+            removed=$((removed + 1))
+        done < <(retention_eligible_dirs "$tier")
+        printf 'tier=%s retention_days=%s removed_directories=%s action=deleted\n' "$tier" "$days" "$removed"
     done
 }
 
@@ -147,7 +171,8 @@ main() {
     case "${1:-backup}" in
         backup) backup_all ;;
         retention-dry-run) retention_dry_run ;;
-        *) fail 'acao deve ser backup ou retention-dry-run' ;;
+        retention-apply) retention_apply ;;
+        *) fail 'acao deve ser backup, retention-dry-run ou retention-apply' ;;
     esac
 }
 
