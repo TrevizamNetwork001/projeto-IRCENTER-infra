@@ -239,7 +239,17 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/ircenter/postgres-data
   redis_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /var/lib/ircenter/redis-data
   app_storage:
     name: ircenter_app_storage
   documentation_storage:
