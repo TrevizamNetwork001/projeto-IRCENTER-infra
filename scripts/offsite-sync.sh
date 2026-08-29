@@ -12,9 +12,23 @@ readonly RCLONE_CONFIG=${RCLONE_CONFIG:-/etc/ircenter/rclone.conf}
 readonly OFFSITE_REMOTE=${OFFSITE_REMOTE:-r2:ircenter-backups}
 readonly OFFSITE_RETENTION_DAYS=${OFFSITE_RETENTION_DAYS:-90}
 readonly LOCK_FILE=${OFFSITE_LOCK_FILE:-/run/ircenter-backup/offsite-sync.lock}
+readonly STATUS_FILE=${OFFSITE_STATUS_FILE:-/var/lib/ircenter/status/offsite-status.env}
 
 log() { printf '[offsite-sync] %s\n' "$1" >&2; }
-fail() { log "FAIL: $1"; exit 1; }
+
+write_status() {
+    local status=$1 status_dir tmp
+    status_dir=$(dirname "$STATUS_FILE")
+    mkdir -p -- "$status_dir"
+    chmod 0755 -- "$status_dir"
+    tmp=$(mktemp "$status_dir/.offsite-status.XXXXXX")
+    printf 'last_offsite_sync_at=%s\nlast_offsite_status=%s\nremote=%s\nretention_days=%s\n' \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$status" "$OFFSITE_REMOTE" "$OFFSITE_RETENTION_DAYS" > "$tmp"
+    chmod 0644 "$tmp"
+    mv -T -- "$tmp" "$STATUS_FILE"
+}
+
+fail() { log "FAIL: $1"; write_status failed; exit 1; }
 
 main() {
     command -v rclone >/dev/null || fail 'rclone nao encontrado'
@@ -40,6 +54,7 @@ main() {
     rclone --config "$RCLONE_CONFIG" rmdirs \
         "$OFFSITE_REMOTE/releases" --leave-root 2>&1 || true
 
+    write_status success
     log 'sincronizacao off-site concluida'
 }
 

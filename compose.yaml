@@ -39,6 +39,10 @@ services:
       - ./app/.env
     volumes:
       - app_storage:/var/www/html/storage
+      - /var/lib/ircenter/status:/var/www/ops-status:ro
+      - /var/lib/ircenter/config:/var/www/ops-config
+    group_add:
+      - "1002"
     tmpfs:
       - /var/www/html/bootstrap/cache:uid=33,gid=33,mode=0770
     depends_on:

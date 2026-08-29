@@ -9,6 +9,7 @@ User=ircenter-backup
 Group=ircenter-backup
 SupplementaryGroups=docker
 EnvironmentFile=/etc/ircenter/backup.env
+EnvironmentFile=-/var/lib/ircenter/config/backup-config.env
 Environment=DOCKER_CONFIG=/var/lib/ircenter/docker-config
 ExecStart=/opt/ircenter/scripts/backup-all.sh backup
 ExecStartPost=-/opt/ircenter/scripts/backup-all.sh retention-apply
