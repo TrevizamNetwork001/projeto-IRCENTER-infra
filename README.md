@@ -7,7 +7,7 @@ uma única release operacional.
 
 ## Arquitetura
 
-- `app/`: Core Laravel, incluindo rede, clientes, auditoria e módulos Finance/Fiscal;
+- `app/`: Core Laravel, incluindo rede, clientes, auditoria e módulos Finance/Fiscal/Agenda;
 - `documentation-app/`: aplicação Laravel de documentação e topologias;
 - `docker/` e `compose.yaml`: Nginx, PHP-FPM, workers, PostgreSQL e Redis;
 - `scripts/`: runners isolados, backup, healthchecks e validações;
