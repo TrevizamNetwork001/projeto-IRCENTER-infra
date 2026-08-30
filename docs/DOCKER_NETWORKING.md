@@ -123,3 +123,15 @@ mudar, portanto deve ser usado apenas para recuperação emergencial.
 - Não recrie PostgreSQL ou Redis durante testes do upstream.
 - Mantenha o resolver restrito ao upstream interno e não adicione DNS externo.
 - Registre IPs apenas como evidência de teste, nunca como configuração.
+
+## Evidência em produção — 30 de agosto de 2026
+
+Durante a ativação controlada da Agenda, somente `app`, `queue` e `scheduler`
+foram recriados. O IP do serviço `app` mudou naturalmente de `172.18.0.6` para
+`172.18.0.9`. Sem executar reload ou restart do Nginx, o resolver interno passou
+a retornar `172.18.0.9` e readiness HTTP/HTTPS, login e `/scheduling` responderam
+200 após o app ficar healthy.
+
+Não houve 502 persistente depois da estabilização. A prova confirma que futuras
+recriações e mudanças naturais do IP do `app` não exigem reload manual do
+Nginx. PostgreSQL, Redis, redes, volumes e imagens permaneceram inalterados.

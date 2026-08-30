@@ -29,3 +29,19 @@ ICS escapa quebras de linha e caracteres RFC; CSV neutraliza células iniciadas 
 Use `scripts/test-isolated.sh app test tests/Feature/Scheduling tests/Unit/Scheduling` para a matriz específica e `scripts/test-isolated.sh app test` para a suíte completa. O runner usa banco descartável e verifica que caches/containers produtivos não mudaram. `scripts/test-e2e.sh` executa Chromium headless em PostgreSQL/Redis temporários, `MAIL_MAILER=array`, providers fake e guardrails contra hosts produtivos. A corrida de duas requisições públicas independentes ao mesmo slot valida o locking real no PostgreSQL.
 
 O E2E cobre booking, cancelamento, reagendamento visual, criação admin, CRUD essencial de disponibilidade/exception, visões dia/semana/mês, axe, teclado, dark/light e viewports 1440×900, 768×1024 e 390×844. Dados são exclusivamente sintéticos e o ambiente é destruído ao terminar.
+# Ativação em produção
+
+Em 30 de agosto de 2026, o módulo foi ativado no ambiente produtivo por meio de
+`SCHEDULING_ENABLED=true`. A migration
+`2026_08_29_120000_create_scheduling_tables` já estava aplicada no batch 19;
+nenhuma migration ou alteração de banco foi executada durante a ativação.
+
+Somente os containers `app`, `queue` e `scheduler` foram recriados para receber
+a variável. Todos ficaram healthy e confirmaram a flag no runtime. O painel,
+login e `/scheduling` responderam 200, e a suíte visual isolada validou Agenda,
+visões diária/semanal/mensal, EventTypes, disponibilidade, exceptions, criação
+administrativa, temas claro/escuro e viewports 1440x900, 768x1024 e 390x844.
+
+Durante a operação, o IP do app mudou de `172.18.0.6` para `172.18.0.9`. O
+Nginx alcançou automaticamente o novo endereço pelo DNS interno Docker, sem
+reload. O procedimento e a evidência estão em `docs/DOCKER_NETWORKING.md`.
