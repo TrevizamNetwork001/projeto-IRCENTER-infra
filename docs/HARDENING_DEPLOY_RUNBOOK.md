@@ -15,7 +15,7 @@ Este runbook é um plano. Ele não autoriza deploy, pull, rebuild, recreate, mig
 
 GO somente se backup aprovado estiver confirmado e restaurável, referências anteriores estiverem registradas, imagens nova e anterior estiverem locais, quatro Compose validarem, suítes isoladas e E2E estiverem verdes, secrets/config obrigatórios existirem, storage/cache estiverem preparados e não houver migration inesperada.
 
-NO-GO diante de imagem ausente, configuração inválida, PostgreSQL/Redis não healthy, `nginx -t` falho, FPM/queue/scheduler falho, erro de APP_KEY, migration não planejada, secret/config ausente, backup não confirmado ou ausência de uma referência de rollback.
+NO-GO diante de imagem ausente, configuração inválida, PostgreSQL/Redis não healthy, `nginx -t` falho, FPM/queue/scheduler falho, erro de APP_KEY, migration não planejada, secret/config ausente, backup não confirmado ou ausência de uma referência de rollback. Liberar o `web` (etapa G) com migration `Pending` esperada pelo deploy e ainda não aplicada (ver F1) também é NO-GO.
 
 ## Etapas de deploy
 
@@ -86,6 +86,15 @@ outras áreas de storage. O canal Monolog `daily` dos dois aplicativos configura
 
 Rollback: parar apenas o bloco afetado, restaurar imagem/Compose/mounts/volumes/configuração anteriores e recriar esse bloco com a imagem anterior local.
 
+### F1 — Aplicar migrations pendentes (obrigatório antes de liberar tráfego)
+
+1. Com os serviços PHP do bloco já `healthy` (pós-F) e o `web` ainda apontando para a versão anterior, executar `docker compose exec -T app php artisan migrate:status` e `... documentation-app php artisan migrate:status` e registrar a lista de migrations `Pending`.
+2. Toda migration `Pending` esperada para este deploy deve ser aplicada agora, uma aplicação por vez, com operador identificado: `docker compose exec -T app php artisan migrate --force` (e equivalente para `documentation-app`).
+3. Rodar `migrate:status` novamente e confirmar zero `Pending` antes de prosseguir para G. Migration `Pending` não prevista no escopo do deploy é NO-GO — investigar antes de continuar.
+4. Nunca liberar o `web` (etapa G) com migrations do código já recriado ainda pendentes: código novo rodando contra schema antigo é a causa raiz de 500 em produção (ver incidente de 2026-08-30, bypass de MFA por `user_mfa_credentials` inexistente).
+
+Rollback: se a migration falhar ou o smoke pós-migration falhar, rodar o `down()` correspondente antes de qualquer novo recreate; não prosseguir para G com schema em estado intermediário.
+
 ### G — Recreate controlado do web/NGINX
 
 1. Executar e aprovar `nginx -t` antes da troca.
@@ -124,6 +133,7 @@ Rollback: manter paths e arquivos anteriores intactos até aceite; reverter conf
 
 ## Smoke pós-deploy futuro
 
+- [ ] `php artisan migrate:status` de `app` e `documentation-app` não mostra nenhuma migration `Pending` esperada por este deploy.
 - [ ] `/up` responde com sucesso.
 - [ ] `/health/ready` responde 200 e `{"status":"ready"}` sem cookie/detalhes internos.
 - [ ] `/login`, login real autorizado e logout funcionam.
