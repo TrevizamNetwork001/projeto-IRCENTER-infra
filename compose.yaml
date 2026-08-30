@@ -18,6 +18,37 @@ services:
       - ./docker/health/nginx-healthcheck.sh:/usr/local/bin/ircenter-nginx-healthcheck:ro
       - ./certbot/www:/var/www/certbot:ro
       - ./certbot/conf:/etc/letsencrypt:ro
+      # Le, somente leitura, o subcaminho publico do mesmo volume que o
+      # app usa para gravar (app_storage). Sem isso, arquivos publicos
+      # gravados pelo Laravel (ex: foto de perfil) nunca ficam visiveis
+      # para o nginx, que enxerga apenas ./app do host.
+      - type: volume
+        source: app_storage
+        target: /var/www/html/storage/app/public
+        read_only: true
+        volume:
+          subpath: app/public
+    # storage/app/public tem modo 750, dono/grupo www-data (gid 33); o
+    # worker do nginx roda como uid/gid 101 (imagem oficial), fora desse
+    # grupo. group_add sozinho nao resolve: o master do nginx roda como
+    # root e o herdaria, mas ao baixar privilegio para o usuario "nginx"
+    # (diretiva "user nginx;" em nginx.conf, que nao esta montado neste
+    # projeto) o proprio nginx chama initgroups() e descarta os grupos
+    # suplementares herdados do container, ficando so com o grupo
+    # proprio (confirmado via /proc/<pid>/status do worker). A correcao
+    # precisa acontecer nos grupos do SISTEMA de arquivos do container
+    # antes do nginx subir: cria um grupo com gid 33 e adiciona o
+    # usuario nginx a ele, depois entrega para o entrypoint oficial da
+    # imagem sem pular nenhuma etapa dele.
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        addgroup -g 33 ircenter-storage 2>/dev/null || true
+        addgroup nginx ircenter-storage 2>/dev/null || true
+        exec /docker-entrypoint.sh "$@"
+      - sh
+    command: ["nginx", "-g", "daemon off;"]
     networks:
       - frontend
       - backend

@@ -135,3 +135,77 @@ a retornar `172.18.0.9` e readiness HTTP/HTTPS, login e `/scheduling` respondera
 Não houve 502 persistente depois da estabilização. A prova confirma que futuras
 recriações e mudanças naturais do IP do `app` não exigem reload manual do
 Nginx. PostgreSQL, Redis, redes, volumes e imagens permaneceram inalterados.
+
+## Storage público compartilhado entre `app` e `web` — 30 de agosto de 2026
+
+### Causa raiz
+
+O serviço `app` grava seu storage gravável (`storage/`) no volume nomeado
+`app_storage` (`ircenter_app_storage`). O serviço `web` nunca montava esse
+volume — ele enxerga apenas `./app` do host, em modo somente leitura. Todo
+arquivo público gravado pelo Laravel via `Storage::disk('public')` (ex: foto
+de perfil) ficava invisível para o Nginx, mesmo com o symlink padrão
+`public/storage -> storage/app/public` criado corretamente: o alvo do
+symlink simplesmente não existia do ponto de vista do container `web`.
+
+Isso não é específico da foto de perfil — qualquer feature futura que grave
+no disco `public` do Laravel esbarraria no mesmo problema.
+
+### Correção aplicada
+
+Duas mudanças em `compose.yaml`, restritas ao serviço `web`:
+
+1. **Volume compartilhado, só o subcaminho necessário.** Monta o mesmo
+   volume `app_storage` em `web`, mas usando `volume.subpath: app/public`
+   para expor **apenas** `storage/app/public` (o disco `public` do
+   Laravel) em `/var/www/html/storage/app/public`, como `read_only: true`.
+   `web` nunca recebeu acesso ao restante de `storage/` (sessions,
+   framework/cache, logs) — só ao subdiretório público.
+
+2. **Grupo do worker do Nginx.** `storage/app/public` tem modo `750`,
+   dono/grupo `www-data` (gid 33 — o mesmo UID/GID usado pelo PHP-FPM do
+   `app`). O worker do Nginx roda como uid/gid 101 (padrão da imagem
+   oficial). `group_add: ["33"]` no nível do serviço **não resolve**: ele
+   afeta o processo raiz do container (que roda como root), mas ao baixar
+   privilégio para o usuário `nginx` (diretiva `user nginx;` em
+   `nginx.conf`, que não é montado neste projeto — vem embutido na
+   imagem), o próprio Nginx chama `initgroups()` internamente e descarta
+   os grupos suplementares herdados, ficando só com o grupo próprio
+   (confirmado inspecionando `/proc/<pid>/status` do processo worker
+   antes e depois).
+
+   A correção real precisa acontecer no `/etc/group` do próprio container
+   `web`, antes do Nginx subir. Como não há Dockerfile próprio para o
+   `web` (usa a imagem oficial `nginx:alpine` diretamente) nem
+   `nginx.conf` montado do host, a solução foi sobrescrever o
+   `entrypoint` do serviço para criar um grupo com gid 33 e adicionar o
+   usuário `nginx` a ele, e só então entregar a execução para o
+   entrypoint oficial da imagem (`/docker-entrypoint.sh`), preservando
+   toda a lógica de template/setup que ele já faz. `command` precisou ser
+   declarado explicitamente (`nginx -g "daemon off;"`) porque sobrescrever
+   `entrypoint` no Compose **não** herda o `CMD` padrão da imagem.
+
+### Symlink
+
+`public/storage -> ../storage/app/public` foi criado uma vez, diretamente
+no host (`/opt/ircenter/app/public/storage`), não dentro de um container —
+é esse arquivo que o `web` enxerga via seu bind mount somente leitura de
+`./app`. Já é ignorado pelo `.gitignore` do projeto (`/public/storage`),
+como é padrão em qualquer instalação Laravel; não deve ser versionado nem
+recriado a cada deploy caso já exista.
+
+### Validação de persistência
+
+Depois de confirmar o fluxo completo (upload, URL pública 200, header
+sincronizado, remoção com fallback correto), o serviço `web` foi recriado
+**mais uma vez**, sem qualquer alteração adicional em `compose.yaml`. A
+URL da foto, o Perfil e o header continuaram respondendo corretamente —
+confirmando que a solução está na configuração declarativa do serviço
+(volume + entrypoint), não em algum estado de camada gravável temporária
+de um container específico.
+
+### Escopo do que NÃO foi tocado
+
+PostgreSQL, Redis, rede Docker, upstream/DNS do Nginx, Certbot, firewall,
+código do `app`, driver de storage do Laravel, e o serviço `app` em si
+(nunca recriado durante esta correção) permaneceram inalterados.
