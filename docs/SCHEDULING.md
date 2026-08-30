@@ -8,9 +8,17 @@ As sete tabelas são criadas por `2026_08_29_120000_create_scheduling_tables.php
 
 ## Disponibilidade e operações
 
-`SlotGenerator` é a única fonte de slots para booking, reagendamento e criação administrativa. Ele combina duração, intervalo, buffers antes/depois, minimum notice, booking horizon, regras semanais, bloqueios, overrides, compromissos ativos e timezone. O calendário público consulta o backend para classificar os dias e possui navegação mensal, loading, vazio, erro, seleção e slots acessíveis.
+`SlotGenerator` é a única fonte de slots para booking, reagendamento e criação administrativa. Ele combina duração, intervalo, buffers antes/depois, minimum notice, booking horizon, regras semanais, bloqueios, overrides, compromissos ativos e timezone. Agendamentos são limitados a segunda-feira até sexta-feira; sábado e domingo permanecem indisponíveis inclusive diante de override. O calendário público consulta o backend para classificar os dias e possui navegação mensal, loading, vazio, erro, seleção e slots acessíveis.
 
 Booking e criação administrativa bloqueiam o `EventType` com `SELECT ... FOR UPDATE`, recalculam o slot dentro da transação e só então persistem. O reagendamento visual usa o mesmo gerador, ignora somente o próprio appointment durante a revalidação bloqueada, registra o horário anterior, invalida reminders antigos e rotaciona ambos os tokens. Cancelamento é idempotente. O admin pode associar cliente e remover exceptions somente pelo vínculo pai correto; ações mutáveis exigem usuário operator/admin, CSRF e geram auditoria.
+
+## Página pública e compartilhamento
+
+Cada `EventType` usa a URL estável e legível `/agenda/{slug}`. O slug é único, serve como chave da rota e aparece na tela administrativa, que oferece **Ver página pública**. Tipos inativos e slugs inexistentes respondem 404 e nunca chegam ao fluxo de reserva.
+
+O cliente escolhe somente dias classificados pelo backend como disponíveis, consulta os slots reais do `SlotGenerator`, seleciona um horário e usa **Avançar** antes de informar nome, e-mail, telefone opcional e motivo/observação opcional. **Voltar** preserva a seleção enquanto a página permanecer aberta. Empresa existe no schema para uso administrativo, mas não é solicitada aqui. Attendees existem no modelo, porém ainda não estão integrados de forma completa ao booking público e ficam fora desta fase.
+
+A página é light-first, não usa navegação administrativa e reflowa de três áreas no desktop para um fluxo vertical até 320 px. O timezone selecionado controla calendário, slots, contexto, persistência e exibição. Duração, data e hora são sempre recalculadas e validadas no servidor.
 
 ## Tokens, notificações e e-mail
 
@@ -18,11 +26,17 @@ Tokens públicos usam 32 bytes aleatórios (256 bits); somente SHA-256 é persis
 
 Novo agendamento, cancelamento e reagendamento geram entradas idempotentes no notification center existente para operadores e administradores, com participante, serviço, data/hora, timezone e cliente quando houver. E-mails Laravel em fila cobrem confirmação, cancelamento, reagendamento e reminders de 24h/1h. Reminders usam chave única `(appointment_id, minutes_before)`; cancelados/passados são ignorados e reagendamento apaga entregas do horário antigo.
 
+A confirmação pública mostra evento, participante principal, data, hora, duração, timezone e ICS. Na navegação imediatamente após criar ou reagendar, a sessão também fornece ações seguras de cancelamento e reagendamento; os mesmos links são enviados por e-mail. IDs internos, observações administrativas e tokens em texto não são exibidos.
+
 ## Tempo, ICS e CSV
 
 Appointments são armazenados como instantes UTC (`timestampTz`). Regras são interpretadas no timezone da própria regra; slots são apresentados no timezone solicitado e o timezone escolhido é salvo no appointment. E-mails usam o timezone salvo. ICS usa UTC com sufixo `Z`. Spring-forward normaliza o início de janela inexistente para o primeiro instante válido e não oferece hora inexistente; fall-back produz instantes ISO únicos. Testes cobrem UTC, `America/Sao_Paulo`, `America/New_York`, mudança de dia e transições DST.
 
 ICS escapa quebras de linha e caracteres RFC; CSV neutraliza células iniciadas por `=`, `+`, `-` ou `@`. As rotas públicas preservam rate limit, honeypot e tempo mínimo de formulário; toda mutação web usa CSRF.
+
+## Limitações desta fase
+
+Não há Google Calendar/Meet, Outlook/Microsoft Graph, Calendly, pagamentos, CRM, round-robin, equipes ou videoconferência própria. O `.ics` existente é a única ação de calendário. A Agenda administrativa não foi redesenhada e não foi criado outro motor de disponibilidade.
 
 ## Validação
 

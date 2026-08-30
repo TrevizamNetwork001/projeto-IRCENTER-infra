@@ -20,6 +20,7 @@ test('booking público completo pelo calendário visual', async ({ monitoredPage
   const date = await nextWeekday(page, true);
   await page.locator(`[data-date="${date}"]`).click();
   await page.getByRole('button', { name: 'Selecionar 09:00' }).click();
+  await page.getByRole('button', { name: 'Avançar' }).click();
   await page.getByLabel('Nome').fill('Booking Browser E2E');
   await page.getByLabel('E-mail').fill('booking-browser@example.test');
   await page.waitForTimeout(2100);
@@ -37,7 +38,7 @@ test('cancelamento público por token seguro', async ({ monitoredPage: page }, t
 test('reagendamento público usa calendário e slots', async ({ monitoredPage: page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'token rotacionado coberto uma vez');
   await page.goto('/agenda/agendamento/01K3RESCHEDA00000000000000/reagendar?token=' + 'b'.repeat(64));
-  await expect(page.getByRole('heading', { name: 'Escolha o novo horário' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Selecione uma nova data' })).toBeVisible();
   const date = await nextWeekday(page, true);
   await page.locator(`[data-date="${date}"]`).click();
   await page.getByRole('button', { name: 'Selecionar 11:00' }).click();
@@ -69,8 +70,6 @@ test('admin cria agendamento e gerencia exception', async ({ monitoredPage: page
 
 test('agenda passa axe, temas, breakpoints e visões', async ({ monitoredPage: page }, testInfo) => {
   await page.goto('/agenda/consultoria-e2e');
-  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-  await page.getByRole('button', { name: 'Alternar tema claro e escuro' }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
   if (testInfo.project.name === 'desktop') await assertA11y(page);
