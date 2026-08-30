@@ -1,18 +1,23 @@
 const { test, expect, login, assertA11y } = require('./support/fixtures');
 
-async function nextWeekday(page) {
-  return page.evaluate(() => {
+async function nextWeekday(page, navigateCalendar = false) {
+  const result = await page.evaluate(() => {
     const date = new Date(); date.setDate(date.getDate() + 2);
     while ([0, 6].includes(date.getDay())) date.setDate(date.getDate() + 1);
-    return date.toISOString().slice(0, 10);
+    return { date: date.toISOString().slice(0, 10), changedMonth: date.getMonth() !== new Date().getMonth() };
   });
+  if (navigateCalendar && result.changedMonth) {
+    await expect(page.locator('#booking-calendar')).toHaveAttribute('aria-busy', 'false');
+    await page.getByRole('button', { name: 'Próximo mês' }).click();
+  }
+  return result.date;
 }
 
 test('booking público completo pelo calendário visual', async ({ monitoredPage: page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'mutação pública coberta uma vez; responsividade coberta separadamente');
   await page.goto('/agenda/consultoria-e2e');
   await expect(page.getByRole('heading', { name: 'Consultoria E2E' })).toBeVisible();
-  const date = await nextWeekday(page);
+  const date = await nextWeekday(page, true);
   await page.locator(`[data-date="${date}"]`).click();
   await page.getByRole('button', { name: 'Selecionar 09:00' }).click();
   await page.getByLabel('Nome').fill('Booking Browser E2E');
@@ -24,16 +29,16 @@ test('booking público completo pelo calendário visual', async ({ monitoredPage
 
 test('cancelamento público por token seguro', async ({ monitoredPage: page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'token de uso único coberto uma vez');
-  await page.goto('/agenda/agendamento/cancel-e2e/cancelar?token=' + 'a'.repeat(64));
+  await page.goto('/agenda/agendamento/01K3CANCEA0000000000000000/cancelar?token=' + 'a'.repeat(64));
   await page.getByRole('button', { name: 'Confirmar cancelamento' }).click();
   await expect(page.getByRole('heading', { name: 'Agendamento cancelado' })).toBeVisible();
 });
 
 test('reagendamento público usa calendário e slots', async ({ monitoredPage: page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'token rotacionado coberto uma vez');
-  await page.goto('/agenda/agendamento/reschedule-e2e/reagendar?token=' + 'b'.repeat(64));
+  await page.goto('/agenda/agendamento/01K3RESCHEDA00000000000000/reagendar?token=' + 'b'.repeat(64));
   await expect(page.getByRole('heading', { name: 'Escolha o novo horário' })).toBeVisible();
-  const date = await nextWeekday(page);
+  const date = await nextWeekday(page, true);
   await page.locator(`[data-date="${date}"]`).click();
   await page.getByRole('button', { name: 'Selecionar 11:00' }).click();
   await page.getByRole('button', { name: 'Confirmar novo horário' }).click();
@@ -80,7 +85,7 @@ test('agenda passa axe, temas, breakpoints e visões', async ({ monitoredPage: p
 test('duas reservas PostgreSQL concorrentes confirmam somente uma', async ({ monitoredPage: page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'concorrência real coberta uma vez');
   await page.goto('/agenda/consultoria-e2e');
-  const date = await nextWeekday(page);
+  const date = await nextWeekday(page, true);
   await page.locator(`[data-date="${date}"]`).click();
   const slotButton = page.getByRole('button', { name: 'Selecionar 15:00' });
   await expect(slotButton).toBeVisible();
