@@ -1,23 +1,31 @@
 # Agenda / Scheduling
 
-O módulo fica em `app/app/Modules/Scheduling` e usa Blade com progressive enhancement. Ele é desabilitado por padrão por `SCHEDULING_ENABLED=false`; quando desabilitado, páginas públicas retornam 404 e o menu administrativo não aparece.
+## Arquitetura e ativação
 
-## Domínio e persistência
+O domínio fica em `app/app/Modules/Scheduling` e reutiliza Laravel, Blade, o centro de notificações e a auditoria do IRCENTER. A feature flag permanece desabilitada por padrão (`SCHEDULING_ENABLED=false`). Em ambiente controlado, habilite-a e execute a migration pelo processo normal do ambiente; nenhuma migration é disparada pela aplicação.
 
-As tabelas `scheduling_event_types`, `scheduling_availability_rules`, `scheduling_availability_exceptions`, `scheduling_appointments`, `scheduling_appointment_attendees`, `scheduling_appointment_events` e `scheduling_reminder_deliveries` são criadas pela migration `2026_08_29_120000_create_scheduling_tables.php`. O rollback remove somente essas tabelas, na ordem de dependência. Tipos com histórico e agendamentos não são apagados operacionalmente: tipos são desativados e agendamentos cancelados.
+As sete tabelas são criadas por `2026_08_29_120000_create_scheduling_tables.php`: tipos, regras, exceptions, appointments, participantes, timeline e entregas de reminders. Não houve migration adicional nesta fase. `ExternalCalendarProvider` continua apenas como ponto de extensão futuro; não há integração Google/Microsoft.
 
-Datas de compromissos são persistidas em UTC. Regras carregam seu timezone explicitamente e a interface converte para o timezone escolhido. `SlotGenerator` aplica janelas, overrides/bloqueios, duração, buffers, antecedência, horizonte e conflitos consultando apenas o intervalo relevante.
+## Disponibilidade e operações
 
-## Concorrência e segurança
+`SlotGenerator` é a única fonte de slots para booking, reagendamento e criação administrativa. Ele combina duração, intervalo, buffers antes/depois, minimum notice, booking horizon, regras semanais, bloqueios, overrides, compromissos ativos e timezone. O calendário público consulta o backend para classificar os dias e possui navegação mensal, loading, vazio, erro, seleção e slots acessíveis.
 
-Criação e reagendamento abrem transação e bloqueiam (`SELECT … FOR UPDATE`) a linha do tipo de evento antes de recalcular o slot. Isso serializa reservas do mesmo tipo no PostgreSQL e impede que duas requisições confirmem o mesmo horário. O teste isolado também cobre a revalidação equivalente. Tokens públicos têm 256 bits aleatórios; somente SHA-256 é armazenado. Rate limits, CSRF, honeypot e tempo mínimo de preenchimento protegem as operações públicas. Tokens e dados pessoais não entram na auditoria.
+Booking e criação administrativa bloqueiam o `EventType` com `SELECT ... FOR UPDATE`, recalculam o slot dentro da transação e só então persistem. O reagendamento visual usa o mesmo gerador, ignora somente o próprio appointment durante a revalidação bloqueada, registra o horário anterior, invalida reminders antigos e rotaciona ambos os tokens. Cancelamento é idempotente. O admin pode associar cliente e remover exceptions somente pelo vínculo pai correto; ações mutáveis exigem usuário operator/admin, CSRF e geram auditoria.
 
-## Rotas e operação
+## Tokens, notificações e e-mail
 
-Público: `/agenda/{slug}`, availability JSON, confirmação, cancelamento, reagendamento e ICS. Administração autenticada: `/scheduling`, calendário diário/semanal/mensal, tipos, disponibilidade, exceções, detalhe e CSV. Viewer lê; admin/operator altera. Associação a cliente é sempre manual.
+Tokens públicos usam 32 bytes aleatórios (256 bits); somente SHA-256 é persistido. Tokens não entram em auditoria ou notificações internas. Os payloads de fila de confirmação/reagendamento carregam os tokens cifrados com a chave da aplicação, nunca em texto puro. Links são validados antes da exibição de cancelar/reagendar.
 
-As notificações Laravel implementam confirmação e lembretes em fila. `SendAppointmentReminders` roda a cada minuto pelo scheduler existente e a tabela de entregas torna 24h/1h idempotentes. O centro interno pode ser ampliado futuramente; `ExternalCalendarProvider` prepara Google/Microsoft sem OAuth nesta entrega. Hosts múltiplos e round-robin podem evoluir do `host_user_id` atual.
+Novo agendamento, cancelamento e reagendamento geram entradas idempotentes no notification center existente para operadores e administradores, com participante, serviço, data/hora, timezone e cliente quando houver. E-mails Laravel em fila cobrem confirmação, cancelamento, reagendamento e reminders de 24h/1h. Reminders usam chave única `(appointment_id, minutes_before)`; cancelados/passados são ignorados e reagendamento apaga entregas do horário antigo.
 
-## Testes e ativação
+## Tempo, ICS e CSV
 
-Execute somente `scripts/test-isolated.sh app test` (ou `app/scripts/test-safe.sh`). O runner usa SQLite em memória, rede desligada e preserva caches/containers produtivos. Antes de ativar, rode a migration no ambiente isolado e então configure `SCHEDULING_ENABLED=true`. Nenhuma migration de produção é executada automaticamente.
+Appointments são armazenados como instantes UTC (`timestampTz`). Regras são interpretadas no timezone da própria regra; slots são apresentados no timezone solicitado e o timezone escolhido é salvo no appointment. E-mails usam o timezone salvo. ICS usa UTC com sufixo `Z`. Spring-forward normaliza o início de janela inexistente para o primeiro instante válido e não oferece hora inexistente; fall-back produz instantes ISO únicos. Testes cobrem UTC, `America/Sao_Paulo`, `America/New_York`, mudança de dia e transições DST.
+
+ICS escapa quebras de linha e caracteres RFC; CSV neutraliza células iniciadas por `=`, `+`, `-` ou `@`. As rotas públicas preservam rate limit, honeypot e tempo mínimo de formulário; toda mutação web usa CSRF.
+
+## Validação
+
+Use `scripts/test-isolated.sh app test tests/Feature/Scheduling tests/Unit/Scheduling` para a matriz específica e `scripts/test-isolated.sh app test` para a suíte completa. O runner usa banco descartável e verifica que caches/containers produtivos não mudaram. `scripts/test-e2e.sh` executa Chromium headless em PostgreSQL/Redis temporários, `MAIL_MAILER=array`, providers fake e guardrails contra hosts produtivos. A corrida de duas requisições públicas independentes ao mesmo slot valida o locking real no PostgreSQL.
+
+O E2E cobre booking, cancelamento, reagendamento visual, criação admin, CRUD essencial de disponibilidade/exception, visões dia/semana/mês, axe, teclado, dark/light e viewports 1440×900, 768×1024 e 390×844. Dados são exclusivamente sintéticos e o ambiente é destruído ao terminar.

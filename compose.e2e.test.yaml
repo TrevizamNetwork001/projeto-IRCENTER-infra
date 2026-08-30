@@ -20,6 +20,8 @@ x-e2e-environment: &e2e-environment
   REDIS_PORT: "6379"
   REDIS_PASSWORD: ""
   MAIL_MAILER: array
+  SCHEDULING_ENABLED: "true"
+  SCHEDULING_TIMEZONE: America/Sao_Paulo
   LOG_CHANNEL: stderr
   LOG_LEVEL: warning
   FINANCE_FISCAL_DB_CONNECTION: pgsql
