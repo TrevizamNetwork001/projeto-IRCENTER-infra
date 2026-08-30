@@ -23,6 +23,7 @@ test('booking público completo pelo calendário visual', async ({ monitoredPage
   await page.locator('#calendar-continue').click();
   await page.getByLabel('Nome completo').fill('Booking Browser E2E');
   await page.getByLabel('E-mail').fill('booking-browser@example.test');
+  await page.getByLabel('Empresa').fill('E2E Labs');
   await page.waitForTimeout(2100);
   await page.locator('#form-continue').click();
   await expect(page.getByRole('heading', { name: 'Confirmar agendamento' })).toBeVisible();
@@ -94,7 +95,7 @@ test('duas reservas PostgreSQL concorrentes confirmam somente uma', async ({ mon
   await expect(slotButton).toBeVisible();
   await slotButton.click();
   const csrf = await page.locator('input[name="_token"]').first().inputValue();
-  const body = suffix => ({ _token: csrf, timezone: 'America/Sao_Paulo', guest_name: `Race ${suffix}`, guest_email: `race-${suffix}@example.test`, form_started_at: Math.floor(Date.now()/1000)-3 });
+  const body = suffix => ({ _token: csrf, timezone: 'America/Sao_Paulo', guest_name: `Race ${suffix}`, guest_email: `race-${suffix}@example.test`, guest_company: 'Race Labs', form_started_at: Math.floor(Date.now()/1000)-3 });
   const selectedStart = await page.locator('#selected-start').inputValue();
   const [a,b] = await Promise.all(['a','b'].map(suffix => page.request.post('/agenda/consultoria-e2e', { form: { ...body(suffix), start: selectedStart }, maxRedirects: 0 })));
   expect([a.status(),b.status()].filter(status => status === 302)).toHaveLength(2);
