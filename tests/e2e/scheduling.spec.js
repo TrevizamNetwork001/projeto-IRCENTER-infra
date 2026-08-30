@@ -20,10 +20,12 @@ test('booking público completo pelo calendário visual', async ({ monitoredPage
   const date = await nextWeekday(page, true);
   await page.locator(`[data-date="${date}"]`).click();
   await page.getByRole('button', { name: 'Selecionar 09:00' }).click();
-  await page.getByRole('button', { name: 'Avançar' }).click();
-  await page.getByLabel('Nome').fill('Booking Browser E2E');
+  await page.locator('#calendar-continue').click();
+  await page.getByLabel('Nome completo').fill('Booking Browser E2E');
   await page.getByLabel('E-mail').fill('booking-browser@example.test');
   await page.waitForTimeout(2100);
+  await page.locator('#form-continue').click();
+  await expect(page.getByRole('heading', { name: 'Confirmar agendamento' })).toBeVisible();
   await page.getByRole('button', { name: 'Confirmar agendamento' }).click();
   await expect(page.getByRole('heading', { name: 'Agendamento confirmado' })).toBeVisible();
 });
@@ -70,6 +72,8 @@ test('admin cria agendamento e gerencia exception', async ({ monitoredPage: page
 
 test('agenda passa axe, temas, breakpoints e visões', async ({ monitoredPage: page }, testInfo) => {
   await page.goto('/agenda/consultoria-e2e');
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.locator('#theme-toggle').click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
   if (testInfo.project.name === 'desktop') await assertA11y(page);
