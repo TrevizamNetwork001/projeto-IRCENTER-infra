@@ -1,16 +1,54 @@
 const { test, expect, login, assertA11y } = require('./support/fixtures');
 
 async function nextWeekday(page, navigateCalendar = false) {
-  const result = await page.evaluate(() => {
-    const date = new Date(); date.setDate(date.getDate() + 2);
-    while ([0, 6].includes(date.getDay())) date.setDate(date.getDate() + 1);
-    return { date: date.toISOString().slice(0, 10), changedMonth: date.getMonth() !== new Date().getMonth() };
-  });
-  if (navigateCalendar && result.changedMonth) {
-    await expect(page.locator('#booking-calendar')).toHaveAttribute('aria-busy', 'false');
-    await page.getByRole('button', { name: 'Próximo mês' }).click();
+  if (!navigateCalendar) {
+    // usado só pelo formulario administrativo (input de data cru, sem
+    // calendario visual pra consultar disponibilidade antes de escolher);
+    // uma janela maior reduz a chance de cair exatamente num feriado.
+    return page.evaluate(() => {
+      const date = new Date(); date.setDate(date.getDate() + 21);
+      while ([0, 6].includes(date.getDay())) date.setDate(date.getDate() + 1);
+      return date.toISOString().slice(0, 10);
+    });
   }
-  return result.date;
+  // Le a disponibilidade real (mesma API que o calendario publico usa) em
+  // vez de so calcular "hoje + 2 dias uteis": um dia util pode ser feriado
+  // nacional (ex.: 7 de setembro) e ficar indisponivel mesmo sem ser fim
+  // de semana - calcular as cegas fazia o teste tentar clicar num dia
+  // desabilitado e travar.
+  const found = await page.evaluate(async () => {
+    // caminho de reagendamento tem endpoint e token proprios; o resto usa
+    // o slug do tipo de evento direto na URL publica.
+    const parts = location.pathname.split('/').filter(Boolean);
+    const isReschedule = parts.includes('reagendar');
+    const availabilityPath = isReschedule
+      ? `/agenda/agendamento/${parts[parts.indexOf('agendamento') + 1]}/reagendar/availability`
+      : `/agenda/${parts[parts.length - 1]}/availability`;
+    const token = new URLSearchParams(location.search).get('token');
+    const date = new Date(); date.setDate(date.getDate() + 2);
+    for (let i = 0; i < 30; i++) {
+      while ([0, 6].includes(date.getDay())) date.setDate(date.getDate() + 1);
+      const iso = date.toISOString().slice(0, 10);
+      const url = new URL(availabilityPath, location.origin);
+      url.searchParams.set('date', iso);
+      url.searchParams.set('timezone', 'America/Sao_Paulo');
+      if (token) url.searchParams.set('token', token);
+      const response = await fetch(url, { headers: { Accept: 'application/json' } });
+      const data = await response.json();
+      if (data.slots && data.slots.length > 0) {
+        const now = new Date();
+        return { date: iso, monthsAhead: (date.getFullYear() - now.getFullYear()) * 12 + (date.getMonth() - now.getMonth()) };
+      }
+      date.setDate(date.getDate() + 1);
+    }
+    throw new Error('Nenhum dia disponivel encontrado em 30 tentativas');
+  });
+  await expect(page.locator('#booking-calendar')).toHaveAttribute('aria-busy', 'false');
+  for (let i = 0; i < found.monthsAhead; i++) {
+    await page.getByRole('button', { name: 'Próximo mês' }).click();
+    await expect(page.locator('#booking-calendar')).toHaveAttribute('aria-busy', 'false');
+  }
+  return found.date;
 }
 
 test('booking público completo pelo calendário visual', async ({ monitoredPage: page }, testInfo) => {
