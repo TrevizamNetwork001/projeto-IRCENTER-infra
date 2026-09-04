@@ -39,7 +39,7 @@ else
     critical certificate_status expired_or_unreadable
 fi
 
-backup_status=${BACKUP_STATUS_FILE:-/var/lib/ircenter/backup-status.env}
+backup_status=${BACKUP_STATUS_FILE:-/var/lib/ircenter/status/backup-status.env}
 if [[ -r "$backup_status" ]]; then
     backup_at=
     while IFS='=' read -r key value; do

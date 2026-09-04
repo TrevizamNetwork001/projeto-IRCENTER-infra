@@ -8,7 +8,7 @@
 set -uo pipefail
 umask 077
 
-readonly STATUS_FILE=${BACKUP_STATUS_FILE:-/var/lib/ircenter/backup-status.env}
+readonly STATUS_FILE=${BACKUP_STATUS_FILE:-/var/lib/ircenter/status/backup-status.env}
 readonly MAX_AGE_MINUTES=${PRE_UPGRADE_BACKUP_MAX_AGE_MINUTES:-60}
 readonly LOG_TAG='[pre-upgrade-snapshot]'
 
