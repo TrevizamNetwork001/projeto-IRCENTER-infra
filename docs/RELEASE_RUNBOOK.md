@@ -12,10 +12,21 @@
 
 ## Deploy
 
-1. Construir uma imagem identificada para Core e outra para Documentation.
-2. Aplicar migrations explicitamente no banco correto, sem migration automática no entrypoint.
-3. Recriar serviços por bloco: Core, workers, Documentation e por último Nginx.
-4. Não recriar PostgreSQL/Redis quando a release não exigir mudança nesses serviços.
+1. Antes de qualquer build, marcar a imagem atual de cada serviço de Core
+   (app, queue, scheduler) com tag própria: `<serviço>:rollback-<commit-atual>`.
+   Com containerd snapshotter, rebuildar a mesma tag (`:latest`) recicla o
+   manifesto da imagem antiga assim que nenhuma tag mais aponta pra ela — o
+   digest antigo deixa de existir no image store, mesmo com o container
+   ainda rodando nele. Sem essa tag prévia, não sobra para onde reverter
+   depois do recreate.
+2. Construir uma imagem identificada para Core e outra para Documentation.
+   Core inclui `app`, `queue` e `scheduler` — cada um tem tag própria no
+   compose (build por serviço, não compartilhado); buildar só `app` deixa
+   `queue` e `scheduler` no código antigo mesmo depois de "recriados" no
+   passo 4.
+3. Aplicar migrations explicitamente no banco correto, sem migration automática no entrypoint.
+4. Recriar serviços por bloco: Core, workers, Documentation e por último Nginx.
+5. Não recriar PostgreSQL/Redis quando a release não exigir mudança nesses serviços.
 
 Para este RC, a migration de identidade cria somente `user_mfa_credentials`.
 Aplicá-la explicitamente depois do backup e antes de recriar Core. Serviços a
